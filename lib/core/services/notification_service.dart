@@ -3,7 +3,8 @@ import 'dart:developer';
 import 'package:flutter/material.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-
+import 'package:timezone/data/latest_all.dart' as tz;
+import 'package:timezone/timezone.dart' as tz;
 // ต้องอยู่ระดับ top-level (นอกคลาส) เพื่อให้ทำงานตอนแอปปิดได้
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -24,6 +25,10 @@ class NotificationService {
       FlutterLocalNotificationsPlugin();
 
   Future<void> init() async {
+    // กำหนด Timezone พื้นฐานสำหรับระบบ Scheduling
+    tz.initializeTimeZones();
+    tz.setLocalLocation(tz.getLocation('Asia/Bangkok'));
+
     try {
       final FirebaseMessaging messaging = FirebaseMessaging.instance;
       // 1. ตั้งค่า Background Handler สำหรับตอนปิดแอป (Terminated) หรือพับจอ (Background)
@@ -115,5 +120,47 @@ class NotificationService {
       body: body,
       notificationDetails: platformDetails,
     );
+  }
+
+  // ยกเลิกการแจังเตือนทั้งหมดที่ถูกตั้งเวลาไว้
+  Future<void> cancelAllNotifications() async {
+    await _localNotifications.cancelAll();
+    log("All scheduled notifications have been cancelled.");
+  }
+
+  // ฟังก์ชันจองการแจ้งเตือนเวลาล่วงหน้า
+  Future<void> scheduleNotification({
+    required int id,
+    required String title,
+    required String body,
+    required DateTime scheduledDate,
+  }) async {
+    const AndroidNotificationDetails androidDetails =
+        AndroidNotificationDetails(
+          'scheduled_channel',
+          'Scheduled Notifications',
+          importance: Importance.max,
+          priority: Priority.high,
+          icon: '@drawable/ic_notification',
+          color: Color(0xFFFFFFFF),
+        );
+    const NotificationDetails platformDetails = NotificationDetails(
+      android: androidDetails,
+    );
+
+    final tz.TZDateTime tzScheduledDate = tz.TZDateTime.from(
+      scheduledDate,
+      tz.local,
+    );
+
+    await _localNotifications.zonedSchedule(
+      id: id,
+      title: title,
+      body: body,
+      scheduledDate: tzScheduledDate,
+      notificationDetails: platformDetails,
+      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+    );
+    log("Scheduled notification id: $id at $tzScheduledDate");
   }
 }

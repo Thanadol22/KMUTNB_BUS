@@ -445,6 +445,21 @@ class _NotificationScreenState extends State<NotificationScreen> {
         final timeRemaining = _getTimeRemaining(startTime);
         final isNextRound = index == nextRoundIndex;
 
+        bool is15MinPassed = false;
+        bool isDepartPassed = false;
+        try {
+          final p = startTime.split(':');
+          if (p.length == 2) {
+            final now = DateTime.now();
+            final target = DateTime(
+              now.year, now.month, now.day,
+              int.parse(p[0]), int.parse(p[1]),
+            );
+            is15MinPassed = now.isAfter(target.subtract(const Duration(minutes: 15)));
+            isDepartPassed = now.isAfter(target);
+          }
+        } catch (_) {}
+
         // ไอคอนและสีตามสถานะ
         IconData icon;
         Color iconColor;
@@ -557,16 +572,12 @@ class _NotificationScreenState extends State<NotificationScreen> {
                             children: [
                               _buildNotifBadge(
                                 '15 ${AppLocalizations.of(context, 'minutes')}',
-                                _notifier.sentNotifications.contains(
-                                  '${sortedDocs[index].id}_15min',
-                                ),
+                                is15MinPassed,
                               ),
                               const SizedBox(width: 6),
                               _buildNotifBadge(
                                 AppLocalizations.of(context, 'depart_now'),
-                                _notifier.sentNotifications.contains(
-                                  '${sortedDocs[index].id}_depart',
-                                ),
+                                isDepartPassed,
                               ),
                             ],
                           ),
