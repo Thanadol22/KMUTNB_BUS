@@ -29,6 +29,7 @@ class _MapScreenState extends State<MapScreen> {
   List<Map<String, dynamic>> _schedulesCache = [];
 
   String? _selectedBusId;
+  LatLng? _lastFollowedPos;
 
   // ===== Cached Streams =====
   late final Stream<DatabaseEvent> _trackingStream = _createTrackingRef()
@@ -470,6 +471,8 @@ class _MapScreenState extends State<MapScreen> {
                   final Set<String> supportedBusIdsSeen = {};
                   final Set<String> supportedBusIdsMissingCoords = {};
 
+                  LatLng? selectedBusLocation;
+
                   if (snapshot.hasData &&
                       snapshot.data!.snapshot.value != null) {
                     final raw = snapshot.data!.snapshot.value;
@@ -504,6 +507,11 @@ class _MapScreenState extends State<MapScreen> {
                       );
                       final speed = _toDouble(busInfo['speed']) ?? 0.0;
 
+                      // เก็บตำแหน่งรถที่เลือกไว้เพื่อใช้ในการ Follow
+                      if (_selectedBusId == busId && lat != null && lon != null) {
+                        selectedBusLocation = LatLng(lat, lon);
+                      }
+
                       DateTime now = DateTime.now();
                       Map<String, dynamic>? activeRound;
                       for (var s in _schedulesCache) {
@@ -530,11 +538,11 @@ class _MapScreenState extends State<MapScreen> {
                           );
 
                           if (now.isAfter(
-                                start.subtract(const Duration(minutes: 10)),
-                              ) &&
-                              now.isBefore(
-                                end.add(const Duration(minutes: 10)),
-                              )) {
+                                 start.subtract(const Duration(minutes: 10)),
+                               ) &&
+                               now.isBefore(
+                                 end.add(const Duration(minutes: 10)),
+                               )) {
                             if (activeRound == null) {
                               activeRound = s;
                             } else {
@@ -607,7 +615,10 @@ class _MapScreenState extends State<MapScreen> {
                             height: 60,
                             child: GestureDetector(
                               onTap: () {
-                                setState(() => _selectedBusId = busId);
+                                setState(() {
+                                  _selectedBusId = busId;
+                                  _lastFollowedPos = busLocation;
+                                });
                                 _mapController.move(busLocation, 18.0);
                               },
                               child: Column(
@@ -689,6 +700,21 @@ class _MapScreenState extends State<MapScreen> {
                     });
                   }
 
+                  // ===== Camera Following Logic =====
+                  if (selectedBusLocation != null &&
+                      selectedBusLocation != _lastFollowedPos) {
+                    _lastFollowedPos = selectedBusLocation;
+                    // ใช้ addPostFrameCallback เพื่อหลีกเลี่ยงความขัดแย้งขณะ Build
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (_selectedBusId != null) {
+                        _mapController.move(
+                          selectedBusLocation!,
+                          _mapController.camera.zoom,
+                        );
+                      }
+                    });
+                  }
+
                   return Stack(
                     children: [
                       FlutterMap(
@@ -696,6 +722,17 @@ class _MapScreenState extends State<MapScreen> {
                         options: MapOptions(
                           initialCenter: centerLocation,
                           initialZoom: 16.0,
+                          onMapEvent: (event) {
+                            // ถ้าเหตุการณ์เกิดจากการกระทำของผู้ใช้ (ไม่ใช่โปรแกรมสั่ง move)
+                            // ให้ยกเลิกการติดตาม (Unlock)
+                            if (event.source != MapEventSource.mapController &&
+                                _selectedBusId != null) {
+                              setState(() {
+                                _selectedBusId = null;
+                                _lastFollowedPos = null;
+                              });
+                            }
+                          },
                         ),
                         children: [
                           TileLayer(
@@ -899,7 +936,10 @@ class _MapScreenState extends State<MapScreen> {
                           ),
                           onPressed: () {
                             _mapController.move(centerLocation, 16.0);
-                            setState(() => _selectedBusId = null);
+                            setState(() {
+                              _selectedBusId = null;
+                              _lastFollowedPos = null;
+                            });
                           },
                         ),
                       ),
@@ -936,8 +976,11 @@ class _MapScreenState extends State<MapScreen> {
 
     return GestureDetector(
       onTap: () {
+        setState(() {
+          _selectedBusId = busId;
+          _lastFollowedPos = busLocation;
+        });
         _mapController.move(busLocation, 18.0);
-        setState(() => _selectedBusId = busId);
       },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 300),

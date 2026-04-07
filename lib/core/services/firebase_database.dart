@@ -62,6 +62,14 @@ class DatabaseService {
     }
   }
 
+  /// อัปเดตทะเบียนรถ
+  Future<void> updateBusLicensePlate(String busId, String licensePlate) async {
+    await _firestore.collection('buses').doc(busId).update({
+      'license_plate': licensePlate,
+      'updated_at': FieldValue.serverTimestamp(),
+    });
+  }
+
   // ==================== Firestore: Schedules ====================
 
   /// Stream ตารางเดินรถทั้งหมด

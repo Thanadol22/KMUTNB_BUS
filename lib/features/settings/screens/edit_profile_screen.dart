@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../core/services/firebase_auth.dart';
 import '../../auth/widgets/custom_text_field.dart';
 import '../../../core/utils/app_localizations.dart';
+import '../../../core/services/firebase_database.dart';
 
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({Key? key}) : super(key: key);
@@ -16,7 +17,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   final _nameController = TextEditingController();
   final _usernameController = TextEditingController();
   final _phoneController = TextEditingController();
+  final _licensePlateController = TextEditingController();
   String? _role;
+  String? _busId;
   bool _isLoading = true;
   bool _isSaving = false;
 
@@ -30,19 +33,34 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     try {
       String? uid = await AuthService.getCurrentUserId();
       if (uid != null) {
-        final doc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
+        final doc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(uid)
+            .get();
         if (doc.exists) {
           final data = doc.data()!;
           _nameController.text = data['name'] ?? '';
           _usernameController.text = data['username'] ?? '';
           _phoneController.text = data['phone'] ?? '';
           _role = data['role'];
+
+          // ถ้าเป็นคนขับ ให้โหลดข้อมูลรถด้วย
+          if (_role != 'student') {
+            final busSnapshot = await DatabaseService().getBusForDriver(uid);
+            if (busSnapshot != null && busSnapshot.docs.isNotEmpty) {
+              final busDoc = busSnapshot.docs.first;
+              _busId = busDoc.id;
+              _licensePlateController.text = busDoc['license_plate'] ?? '';
+            }
+          }
         }
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('เกิดข้อผิดพลาดในการโหลดข้อมูล: ${e.toString()}')),
+          SnackBar(
+            content: Text('เกิดข้อผิดพลาดในการโหลดข้อมูล: ${e.toString()}'),
+          ),
         );
       }
     } finally {
@@ -68,6 +86,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         phone: _phoneController.text.trim(),
         username: _usernameController.text.trim(),
       );
+
+      // บันทึกทะเบียนรถ (ถ้ามี)
+      if (_busId != null && _role != 'student') {
+        await DatabaseService().updateBusLicensePlate(
+          _busId!,
+          _licensePlateController.text.trim(),
+        );
+      }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -115,8 +141,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   children: [
                     CustomTextField(
                       controller: _usernameController,
-                      label: AppLocalizations.of(context,
-                          _role == 'student' ? 'student_id' : 'employee_id'),
+                      label: AppLocalizations.of(
+                        context,
+                        _role == 'student' ? 'student_id' : 'employee_id',
+                      ),
                       icon: Icons.badge,
                       validator: (value) {
                         if (value == null || value.isEmpty) {
@@ -145,6 +173,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         icon: Icons.phone,
                         keyboardType: TextInputType.phone,
                       ),
+                      const SizedBox(height: 16),
+                      CustomTextField(
+                        controller: _licensePlateController,
+                        label: AppLocalizations.of(
+                          context,
+                          'license_plate_label',
+                        ),
+                        icon: Icons.directions_bus,
+                      ),
                     ],
                     const SizedBox(height: 32),
                     SizedBox(
@@ -157,10 +194,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         ),
                         onPressed: _isSaving ? null : _saveProfile,
                         child: _isSaving
-                            ? const CircularProgressIndicator(color: Colors.white)
+                            ? const CircularProgressIndicator(
+                                color: Colors.white,
+                              )
                             : Text(
                                 AppLocalizations.of(context, 'save_profile'),
-                                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                       ),
                     ),
