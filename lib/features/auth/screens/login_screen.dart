@@ -4,6 +4,7 @@ import '../../driver/driver_main_screen.dart';
 import '../widgets/custom_text_field.dart';
 import 'register_screen.dart';
 import '../../../core/utils/app_localizations.dart';
+import '../../../core/services/firebase_auth.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
@@ -13,34 +14,67 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
+  final AuthService _authService = AuthService();
+  bool _isLoading = false;
 
-  void _handleLogin() {
-    final email = _emailController.text.trim().toLowerCase();
+  void _handleLogin() async {
+    final username = _usernameController.text.trim().toLowerCase();
     final password = _passwordController.text;
 
-    if (email.isEmpty || password.isEmpty) {
+    if (username.isEmpty || password.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(AppLocalizations.of(context, 'missing_input'))),
       );
       return;
     }
 
-    if (email == 'student@gmail.com' && password == '111111') {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const StudentMainScreen()),
-      );
-    } else if (email == 'driver@gmail.com' && password == '111111') {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const DriverMainScreen()),
-      );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppLocalizations.of(context, 'invalid_login'))),
-      );
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final userData = await _authService.login(username, password);
+
+      if (!mounted) return;
+
+      String role = userData['role'] ?? 'student';
+
+      if (role == 'driver') {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const DriverMainScreen()),
+        );
+      } else {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const StudentMainScreen()),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        String errorMessage = AppLocalizations.of(context, 'invalid_login');
+        if (e.toString().contains('invalid_login')) {
+          errorMessage = AppLocalizations.of(context, 'invalid_login');
+        } else if (e.toString().contains('user_inactive')) {
+          errorMessage = 'บัญชีนี้ปิดการใช้งาน หรือถูกระงับ (Inactive)';
+        } else if (e.toString().contains('network_error')) {
+          errorMessage = 'การเชื่อมต่ออินเทอร์เน็ตมีปัญหา';
+        } else {
+          errorMessage = 'Error: ${e.toString()}';
+        }
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(errorMessage), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -48,75 +82,74 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24.0),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const Icon(
-                  Icons.directions_bus,
-                  size: 100,
-                  color: Colors.orange,
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  AppLocalizations.of(context, 'login_title'),
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.orange,
-                  ),
-                ),
-                const SizedBox(height: 32),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Image.asset('assets/logo/logo.png', height: 500),
 
-                CustomTextField(
-                  label: AppLocalizations.of(context, 'email'),
-                  icon: Icons.email,
-                  controller: _emailController,
-                  keyboardType: TextInputType.emailAddress,
-                ),
-                CustomTextField(
-                  label: AppLocalizations.of(context, 'password'),
-                  icon: Icons.lock,
-                  isPassword: true,
-                  controller: _passwordController,
-                ),
-
-                const SizedBox(height: 24),
-                ElevatedButton(
-                  onPressed: _handleLogin,
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    backgroundColor: Colors.orange,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+              Transform.translate(
+                offset: const Offset(0, -150),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    CustomTextField(
+                      label: AppLocalizations.of(context, 'username'),
+                      icon: Icons.person,
+                      controller: _usernameController,
+                      keyboardType: TextInputType.text,
                     ),
-                  ),
-                  child: Text(
-                    AppLocalizations.of(context, 'login_btn'),
-                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)
-                  ),
+                    CustomTextField(
+                      label: AppLocalizations.of(context, 'password'),
+                      icon: Icons.lock,
+                      isPassword: true,
+                      controller: _passwordController,
+                    ),
+                    const SizedBox(height: 24),
+                    _isLoading
+                        ? const Center(child: CircularProgressIndicator())
+                        : ElevatedButton(
+                            onPressed: _handleLogin,
+                            style: ElevatedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(
+                                vertical: 16,
+                              ),
+                              backgroundColor: const Color(0xFFFF4009),
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            child: Text(
+                              AppLocalizations.of(context, 'login_btn'),
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                    const SizedBox(height: 16),
+                    TextButton(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const RegisterScreen(),
+                          ),
+                        );
+                      },
+                      child: Text(AppLocalizations.of(context, 'no_account')),
+                    ),
+                  ],
                 ),
-                
-                const SizedBox(height: 16),
-                TextButton(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => const RegisterScreen()),
-                    );
-                  },
-                  child: Text(AppLocalizations.of(context, 'no_account')),
-                )
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
     );
   }
 }
+
+

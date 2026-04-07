@@ -1,29 +1,71 @@
 import 'package:flutter/material.dart';
-import 'package:device_preview/device_preview.dart';
 import 'package:provider/provider.dart';
 import 'core/theme/theme_provider.dart';
 import 'core/utils/localization_provider.dart';
 import 'core/services/notification_service.dart';
-// import 'package:firebase_core/firebase_core.dart'; // เตรียมไว้เมื่อเชื่อม Firebase
+import 'core/services/firebase_database.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'app.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // await Firebase.initializeApp(); // คอมเมนต์ไว้ก่อน รอเชื่อมต่อฐานข้อมูล
+  try {
+    try {
+      await dotenv.load(fileName: ".env");
+    } catch (e) {
+      debugPrint("Warning: Could not load .env file: $e");
+    }
 
-  // เรียกใช้งานระบบจำลองแจ้งเตือน (และเตรียม Firebase Messaging ให้พร้อม)
-  await NotificationService().init();
+    try {
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
+    } on FirebaseException catch (e) {
+      if (e.code != 'duplicate-app') {
+        rethrow;
+      }
+    }
+    
+    // ไม่ให้ NotificationService บล็อกการรันแอป ถ้ารอฟรีสัพพลายเออร์นานไป
+    NotificationService().init().catchError((e) {
+      debugPrint("NotificationService init error: $e");
+    });
 
-  runApp(
-    MultiProvider(
-      providers: [
-        ChangeNotifierProvider(create: (_) => ThemeProvider()),
-        ChangeNotifierProvider(create: (_) => LocalizationProvider()),
-      ],
-      child: DevicePreview(
-        enabled: true, // เปิดใช้งาน Device Preview
-        builder: (context) => const BusTrackerApp(),
+    // Auto-seed ตารางเดินรถ ใน Background (ไม่บล็อกการเริ่มแอพ)
+    DatabaseService().seedSchedules().catchError((e) {
+      debugPrint("Error seeding schedules: $e");
+    });
+
+    runApp(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider(create: (_) => ThemeProvider()),
+          ChangeNotifierProvider(create: (_) => LocalizationProvider()),
+        ],
+        child: const BusTrackerApp(),
       ),
-    ),
-  );
+    );
+  } catch (e, stackTrace) {
+    debugPrint("Initialization error: $e\n$stackTrace");
+    runApp(
+      MaterialApp(
+        home: Scaffold(
+          body: Center(
+            child: SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Text(
+                  "App Initialization Failed:\n\n$e\n\n$stackTrace",
+                  style: const TextStyle(color: Colors.red, fontSize: 14),
+                  textAlign: TextAlign.left,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }

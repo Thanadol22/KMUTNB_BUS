@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../../core/services/firebase_auth.dart';
 
 class ReportScreen extends StatefulWidget {
   const ReportScreen({Key? key}) : super(key: key);
@@ -9,14 +11,77 @@ class ReportScreen extends StatefulWidget {
 
 class _ReportScreenState extends State<ReportScreen> {
   final _formKey = GlobalKey<FormState>();
+  final TextEditingController _descController = TextEditingController();
   String? _selectedIssue;
+  bool _isSubmitting = false;
+
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
+  Future<void> _submitReport() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() {
+      _isSubmitting = true;
+    });
+
+    try {
+      String? studentId = await AuthService.getCurrentUserId();
+      if (studentId == null) {
+        throw Exception('User UID not found. Please relogin.');
+      }
+
+      // Convert enum/value to topic based on database.md spec
+      String topicName = '';
+      if (_selectedIssue == 'late') topicName = 'รถไม่มาตรงเวลา';
+      else if (_selectedIssue == 'driver') topicName = 'พฤติกรรมพนักงานขับรถ';
+      else if (_selectedIssue == 'app') topicName = 'แอปพลิเคชันมีปัญหา';
+      else topicName = 'อื่นๆ';
+
+      await _firestore.collection('issue_reports').add({
+        'student_id': studentId,
+        'topic': topicName,
+        'description': _descController.text.trim(),
+        'status': 'pending', // (รอดำเนินการ)
+        'timestamp': FieldValue.serverTimestamp(),
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('ส่งรายงานความร้องเรียนสำเร็จ'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        _formKey.currentState!.reset();
+        _descController.clear();
+        setState(() {
+          _selectedIssue = null;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('แจ้งปัญหาการใช้บริการ'),
-        backgroundColor: Colors.orange,
+        backgroundColor: Color(0xFFFF4009),
         foregroundColor: Colors.white,
       ),
       body: SingleChildScrollView(
@@ -34,7 +99,7 @@ class _ReportScreenState extends State<ReportScreen> {
               DropdownButtonFormField<String>(
                 value: _selectedIssue,
                 items: const [
-                  DropdownMenuItem(value: 'late', child: Text('ช้ากว่ากำหนดมากๆ')),
+                  DropdownMenuItem(value: 'late', child: Text('รถไม่มาตรงเวลา')),
                   DropdownMenuItem(value: 'driver', child: Text('พฤติกรรมพนักงานขับรถ')),
                   DropdownMenuItem(value: 'app', child: Text('แอปพลิเคชันมีปัญหา')),
                   DropdownMenuItem(value: 'other', child: Text('อื่นๆ')),
@@ -59,6 +124,7 @@ class _ReportScreenState extends State<ReportScreen> {
               ),
               const SizedBox(height: 8),
               TextFormField(
+                controller: _descController,
                 maxLines: 5,
                 decoration: InputDecoration(
                   border: OutlineInputBorder(
@@ -79,27 +145,16 @@ class _ReportScreenState extends State<ReportScreen> {
                 height: 50,
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.orange,
+                    backgroundColor: Color(0xFFFF4009),
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8),
                     ),
                   ),
-                  onPressed: () {
-                    if (_formKey.currentState!.validate()) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                         const SnackBar(
-                           content: Text('ส่งรายงานสำเร็จ (จำลองข้อมูล)'),
-                           backgroundColor: Colors.green,
-                         ),
-                      );
-                      _formKey.currentState!.reset();
-                      setState(() {
-                        _selectedIssue = null;
-                      });
-                    }
-                  },
-                  child: const Text('ส่งรายงาน', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  onPressed: _isSubmitting ? null : _submitReport,
+                  child: _isSubmitting
+                      ? const CircularProgressIndicator(color: Colors.white)
+                      : const Text('ส่งรายงาน', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                 ),
               ),
             ],
@@ -109,3 +164,4 @@ class _ReportScreenState extends State<ReportScreen> {
     );
   }
 }
+

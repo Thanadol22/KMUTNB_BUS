@@ -28,7 +28,7 @@ class _DriverMainScreenState extends State<DriverMainScreen> {
       body: _pages[_currentIndex],
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
-        selectedItemColor: Colors.orange,
+        selectedItemColor: Color(0xFFFF4009),
         unselectedItemColor: Colors.grey,
         type: BottomNavigationBarType.fixed,
         onTap: (index) {

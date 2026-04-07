@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../auth/screens/login_screen.dart';
+import '../../../core/services/firebase_auth.dart';
 import '../../../core/theme/theme_provider.dart';
 import '../../../core/utils/localization_provider.dart';
 import '../../../core/utils/app_localizations.dart';
+import 'edit_profile_screen.dart';
+import 'change_password_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({Key? key}) : super(key: key);
@@ -38,13 +41,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
             leading: const Icon(Icons.person),
             title: Text(AppLocalizations.of(context, 'edit_profile')),
             trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-            onTap: () {},
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const EditProfileScreen()),
+              );
+            },
           ),
           ListTile(
             leading: const Icon(Icons.lock),
             title: Text(AppLocalizations.of(context, 'change_password')),
             trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-            onTap: () {},
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const ChangePasswordScreen()),
+              );
+            },
           ),
           const Divider(height: 32),
           Text(
@@ -73,7 +86,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             secondary: const Icon(Icons.dark_mode),
             title: Text(AppLocalizations.of(context, 'dark_mode')),
             value: themeProvider.isDarkMode,
-            activeColor: Colors.orange,
+            activeColor: Color(0xFFFF4009),
             onChanged: (value) {
               themeProvider.toggleTheme();
             },
@@ -85,12 +98,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
               AppLocalizations.of(context, 'logout'),
               style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
             ),
-            onTap: () {
-              Navigator.pushAndRemoveUntil(
-                context,
-                MaterialPageRoute(builder: (context) => const LoginScreen()),
-                (route) => false,
-              );
+            onTap: () async {
+              await AuthService().logout();
+              if (context.mounted) {
+                Navigator.pushAndRemoveUntil(
+                  context,
+                  MaterialPageRoute(builder: (context) => const LoginScreen()),
+                  (route) => false,
+                );
+              }
             },
           ),
         ],

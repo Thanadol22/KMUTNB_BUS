@@ -13,19 +13,19 @@ class ThemeProvider with ChangeNotifier {
     if (_isDarkMode) {
       return ThemeData.dark().copyWith(
         colorScheme: const ColorScheme.dark(
-          primary: Colors.orange,
-          secondary: Colors.orangeAccent,
+          primary: Color(0xFFFF4009),
+          secondary: Color(0xFFFF4009),
         ),
         appBarTheme: const AppBarTheme(
-          backgroundColor: Colors.orange,
+          backgroundColor: Color(0xFFFF4009),
           foregroundColor: Colors.white,
         ),
       );
     } else {
       return ThemeData.light().copyWith(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.orange),
+        colorScheme: ColorScheme.fromSeed(seedColor: Color(0xFFFF4009)),
         appBarTheme: const AppBarTheme(
-          backgroundColor: Colors.orange,
+          backgroundColor: Color(0xFFFF4009),
           foregroundColor: Colors.white,
         ),
         useMaterial3: true,

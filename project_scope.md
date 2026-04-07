@@ -3,6 +3,7 @@
 **🚨 AI Assistant & Developer Rules:**
 1. **Always read this file (`project_scope.md`) before analyzing requirements or implementing features.**
 2. **Strictly adhere to the scope defined here.** Do not add, imagine, or suggest features that fall outside of this project scope.
+3. **Always review this scope file (`project_scope.md`) before analyzing, designing, or implementing any database connection or database structure.**
 
 [cite_start]แอปพลิเคชันสำหรับติดตามตำแหน่งรถรับส่งภายในมหาวิทยาลัยเทคโนโลยีพระจอมเกล้าพระนครเหนือแบบเรียลไทม์ เพื่ออำนวยความสะดวกให้กับนักศึกษาในการตรวจสอบตำแหน่งและเวลาที่รถจะมาถึง พร้อมทั้งมีระบบสำหรับพนักงานขับรถในการลงรายงานข้อมูลรายวัน รวมถึงเว็บไซต์สำหรับผู้ดูแลระบบในการจัดการข้อมูล และตรวจสอบสถานะของรถแต่ละคัน [cite: 32] [cite_start]โดยมีขอบเขตการทำงานของระบบดังนี้[cite: 32]:
 
