@@ -452,10 +452,15 @@ class _NotificationScreenState extends State<NotificationScreen> {
           if (p.length == 2) {
             final now = DateTime.now();
             final target = DateTime(
-              now.year, now.month, now.day,
-              int.parse(p[0]), int.parse(p[1]),
+              now.year,
+              now.month,
+              now.day,
+              int.parse(p[0]),
+              int.parse(p[1]),
             );
-            is15MinPassed = now.isAfter(target.subtract(const Duration(minutes: 15)));
+            is15MinPassed = now.isAfter(
+              target.subtract(const Duration(minutes: 15)),
+            );
             isDepartPassed = now.isAfter(target);
           }
         } catch (_) {}

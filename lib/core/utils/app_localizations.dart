@@ -90,11 +90,11 @@ class AppLocalizations {
       'show_all_rounds': 'ดูทุกรอบ',
       'auto_notification_toggle': 'แจ้งเตือนอัตโนมัติ',
       'notification_active_desc':
-          'ระบบจะแจ้งเตือนก่อนออกรถ 5 นาที และเมื่อถึงเวลาออกรถ',
+          'ระบบจะแจ้งเตือนก่อนออกรถ 15 นาที และเมื่อถึงเวลาออกรถ',
       'notification_inactive_desc':
           'เปิดเพื่อรับแจ้งเตือนก่อนถึงรอบรถอัตโนมัติ',
       'notification_info':
-          'แจ้งเตือน 2 ครั้ง: ก่อนถึงรอบ 5 นาที และเมื่อถึงเวลาออกรถ',
+          'แจ้งเตือน 2 ครั้ง: ก่อนถึงรอบ 15 นาที และเมื่อถึงเวลาออกรถ',
       'depart_now': 'ออกรถ',
       'status_running': 'กำลังวิ่ง',
       'status_parking': 'จอดอยู่',
@@ -250,11 +250,11 @@ class AppLocalizations {
       'show_all_rounds': 'Show All Rounds',
       'auto_notification_toggle': 'Auto Notifications',
       'notification_active_desc':
-          'You will be notified 5 min before and at departure time',
+          'You will be notified 15 min before and at departure time',
       'notification_inactive_desc':
           'Enable to receive automatic schedule notifications',
       'notification_info':
-          '2 alerts per round: 5 min before & at departure time',
+          '2 alerts per round: 15 min before & at departure time',
       'depart_now': 'Depart',
       'status_running': 'Running',
       'status_parking': 'Parked',
