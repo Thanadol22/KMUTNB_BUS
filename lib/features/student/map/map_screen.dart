@@ -6,6 +6,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:rxdart/rxdart.dart';
 import 'dart:async';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../../../core/utils/app_localizations.dart';
 import '../../../models/location_model.dart';
 import '../../../core/services/firebase_database.dart';
@@ -47,11 +48,10 @@ class _MapScreenState extends State<MapScreen> {
   /// สร้าง DatabaseReference ที่ชี้ไปยัง RTDB ที่ถูกต้อง (รองรับ asia-southeast1)
   DatabaseReference _createTrackingRef() {
     final app = Firebase.app();
-    // ใช้ URL ตรงเพื่อหลีกเลี่ยงปัญหา firebase_options.dart ไม่มี databaseURL
+    // ใช้ URL จาก .env แทนการ hardcode เพื่อความปลอดภัย
     return FirebaseDatabase.instanceFor(
       app: app,
-      databaseURL:
-          'https://projectkmutnbbus-default-rtdb.asia-southeast1.firebasedatabase.app',
+      databaseURL: dotenv.env['FIREBASE_DATABASE_URL'] ?? '',
     ).ref('tracking');
   }
 
