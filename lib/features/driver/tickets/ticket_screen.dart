@@ -20,6 +20,7 @@ class _TicketScreenState extends State<TicketScreen> {
   String? _busId;
   bool _isSubmitting = false;
   List<int> _nearbyRounds = [];
+  bool _showAllReports = false;
 
   @override
   void initState() {
@@ -63,7 +64,9 @@ class _TicketScreenState extends State<TicketScreen> {
 
     if (countText.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppLocalizations.of(context, 'enter_ticket_count'))),
+        SnackBar(
+          content: Text(AppLocalizations.of(context, 'enter_ticket_count')),
+        ),
       );
       return;
     }
@@ -71,14 +74,18 @@ class _TicketScreenState extends State<TicketScreen> {
     final ticketCount = int.tryParse(countText);
     if (ticketCount == null || ticketCount < 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppLocalizations.of(context, 'invalid_ticket_count'))),
+        SnackBar(
+          content: Text(AppLocalizations.of(context, 'invalid_ticket_count')),
+        ),
       );
       return;
     }
 
     if (_selectedRoundIndex == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppLocalizations.of(context, 'select_round_time'))),
+        SnackBar(
+          content: Text(AppLocalizations.of(context, 'select_round_time')),
+        ),
       );
       return;
     }
@@ -116,7 +123,9 @@ class _TicketScreenState extends State<TicketScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('เกิดข้อผิดพลาด: ${e.toString()}'),
+            content: Text(
+              '${AppLocalizations.of(context, 'error_prefix')}: ${e.toString()}',
+            ),
             backgroundColor: Colors.red,
           ),
         );
@@ -128,6 +137,79 @@ class _TicketScreenState extends State<TicketScreen> {
         });
       }
     }
+  }
+
+  void _onNumberPressed(String digit) {
+    if (_ticketCountController.text.length < 5) {
+      // Limit to 5 digits
+      setState(() {
+        _ticketCountController.text += digit;
+      });
+    }
+  }
+
+  void _onDeletePressed() {
+    if (_ticketCountController.text.isNotEmpty) {
+      setState(() {
+        _ticketCountController.text = _ticketCountController.text.substring(
+          0,
+          _ticketCountController.text.length - 1,
+        );
+      });
+    }
+  }
+
+  void _onClearPressed() {
+    setState(() {
+      _ticketCountController.clear();
+    });
+  }
+
+  Widget _buildKey(
+    String label, {
+    IconData? icon,
+    VoidCallback? onPressed,
+    Color? color, // ใช้เป็นสีพื้นหลังถ้าต้องการปุ่มแบบทึบ
+  }) {
+    final primaryColor = const Color(0xFFFF4009);
+    final isSolid = color != null;
+
+    return Expanded(
+      child: Padding(
+        padding: const EdgeInsets.all(6.0),
+        child: Center(
+          child: Material(
+            color: isSolid ? color : Colors.transparent,
+            shape: CircleBorder(
+              side: BorderSide(color: primaryColor, width: 1.5),
+            ),
+            child: InkWell(
+              onTap: onPressed ?? () => _onNumberPressed(label),
+              customBorder: const CircleBorder(),
+              child: Container(
+                width: 60,
+                height: 60,
+                alignment: Alignment.center,
+                child: icon != null
+                    ? Icon(
+                        icon,
+                        size: 24,
+                        color: isSolid ? Colors.white : primaryColor,
+                      )
+                    : Text(
+                        label,
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                          color: isSolid ? Colors.white : primaryColor,
+                        ),
+                      ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -154,8 +236,13 @@ class _TicketScreenState extends State<TicketScreen> {
             if (_busId != null)
               Card(
                 child: ListTile(
-                  leading: const Icon(Icons.directions_bus, color: Color(0xFFFF4009)),
-                  title: Text('${AppLocalizations.of(context, 'bus_label')}: $_busId'),
+                  leading: const Icon(
+                    Icons.directions_bus,
+                    color: Color(0xFFFF4009),
+                  ),
+                  title: Text(
+                    '${AppLocalizations.of(context, 'bus_label')}: $_busId',
+                  ),
                 ),
               ),
 
@@ -179,17 +266,23 @@ class _TicketScreenState extends State<TicketScreen> {
 
                 // ตรวจสอบว่าเป็นรอบปัจจุบันหรือไม่
                 final startParts = startTime.split(':');
-                final startMin = int.parse(startParts[0]) * 60 + int.parse(startParts[1]);
+                final startMin =
+                    int.parse(startParts[0]) * 60 + int.parse(startParts[1]);
                 final endParts = endTime.split(':');
-                final endMin = int.parse(endParts[0]) * 60 + int.parse(endParts[1]);
+                final endMin =
+                    int.parse(endParts[0]) * 60 + int.parse(endParts[1]);
 
-                String label = 'รอบ $roundNum ($startTime - $endTime)';
+                String label =
+                    '${AppLocalizations.of(context, 'round_label_short')} $roundNum ($startTime - $endTime)';
                 if (nowMinutes >= startMin && nowMinutes <= endMin) {
-                  label += ' ← กำลังวิ่ง';
-                } else if (startMin > nowMinutes && startMin - nowMinutes <= 30) {
-                  label += ' ← ถัดไป';
+                  label +=
+                      ' ← ${AppLocalizations.of(context, 'status_running')}';
+                } else if (startMin > nowMinutes &&
+                    startMin - nowMinutes <= 30) {
+                  label +=
+                      ' ← ${AppLocalizations.of(context, 'next_label_short')}';
                 } else if (endMin < nowMinutes) {
-                  label += ' (ผ่านไปแล้ว)';
+                  label += ' (${AppLocalizations.of(context, 'round_passed')})';
                 }
 
                 return DropdownMenuItem<int>(
@@ -199,10 +292,12 @@ class _TicketScreenState extends State<TicketScreen> {
                     style: TextStyle(
                       fontSize: 14,
                       color: (endMin < nowMinutes) ? Colors.grey : null,
-                      fontWeight: (nowMinutes >= startMin && nowMinutes <= endMin)
+                      fontWeight:
+                          (nowMinutes >= startMin && nowMinutes <= endMin)
                           ? FontWeight.bold
                           : FontWeight.normal,
                     ),
+                    overflow: TextOverflow.ellipsis,
                   ),
                 );
               }).toList(),
@@ -212,8 +307,13 @@ class _TicketScreenState extends State<TicketScreen> {
                 });
               },
               decoration: InputDecoration(
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                prefixIcon: const Icon(Icons.access_time, color: Color(0xFFFF4009)),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                prefixIcon: const Icon(
+                  Icons.access_time,
+                  color: Color(0xFFFF4009),
+                ),
               ),
             ),
 
@@ -244,13 +344,84 @@ class _TicketScreenState extends State<TicketScreen> {
             ),
             const SizedBox(height: 8),
 
-            TextField(
-              controller: _ticketCountController,
-              keyboardType: TextInputType.number,
-              decoration: InputDecoration(
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                hintText: AppLocalizations.of(context, 'enter_exact_passenger'),
-                prefixIcon: const Icon(Icons.confirmation_number, color: Color(0xFFFF4009)),
+            // ช่องแสดงจำนวนตั๋ว
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.grey.shade400),
+                borderRadius: BorderRadius.circular(12),
+                color: Colors.grey.shade50,
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.confirmation_number,
+                    color: Color(0xFFFF4009),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      _ticketCountController.text.isEmpty
+                          ? AppLocalizations.of(
+                              context,
+                              'enter_exact_passenger',
+                            )
+                          : _ticketCountController.text,
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: _ticketCountController.text.isEmpty
+                            ? Colors.grey
+                            : Colors.black87,
+                      ),
+                    ),
+                  ),
+                  if (_ticketCountController.text.isNotEmpty)
+                    IconButton(
+                      icon: const Icon(Icons.close, color: Colors.grey),
+                      onPressed: _onClearPressed,
+                    ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            // แป้นพิมพ์ตัวเลข
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Column(
+                children: [
+                  Row(
+                    children: [_buildKey('1'), _buildKey('2'), _buildKey('3')],
+                  ),
+                  Row(
+                    children: [_buildKey('4'), _buildKey('5'), _buildKey('6')],
+                  ),
+                  Row(
+                    children: [_buildKey('7'), _buildKey('8'), _buildKey('9')],
+                  ),
+                  Row(
+                    children: [
+                      _buildKey(
+                        'C',
+                        color: const Color(0xFFFF4009),
+                        onPressed: _onClearPressed,
+                      ),
+                      _buildKey('0'),
+                      _buildKey(
+                        '⌫',
+                        icon: Icons.backspace_outlined,
+                        color: const Color(0xFFFF4009),
+                        onPressed: _onDeletePressed,
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ),
 
@@ -270,7 +441,10 @@ class _TicketScreenState extends State<TicketScreen> {
                     ? const CircularProgressIndicator(color: Colors.white)
                     : Text(
                         AppLocalizations.of(context, 'save_ticket'),
-                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
               ),
             ),
@@ -292,7 +466,9 @@ class _TicketScreenState extends State<TicketScreen> {
                 }
 
                 return StreamBuilder<QuerySnapshot>(
-                  stream: _dbService.getTicketReportsForDriver(uidSnapshot.data!),
+                  stream: _dbService.getTicketReportsForDriver(
+                    uidSnapshot.data!,
+                  ),
                   builder: (context, snapshot) {
                     if (snapshot.hasError) {
                       return Card(
@@ -301,7 +477,10 @@ class _TicketScreenState extends State<TicketScreen> {
                           child: Center(
                             child: Text(
                               'Error: ${snapshot.error}',
-                              style: const TextStyle(color: Colors.red, fontSize: 12),
+                              style: const TextStyle(
+                                color: Colors.red,
+                                fontSize: 12,
+                              ),
                             ),
                           ),
                         ),
@@ -344,22 +523,72 @@ class _TicketScreenState extends State<TicketScreen> {
                       return tsB.compareTo(tsA);
                     });
 
-                    final reports = allDocs.take(5).toList();
+                    final reports = _showAllReports
+                        ? allDocs
+                        : allDocs.take(3).toList();
                     return Column(
-                      children: reports.map((doc) {
-                        final data = doc.data() as Map<String, dynamic>;
-                        final timestamp = (data['timestamp'] as Timestamp?)?.toDate();
-                        final dateStr = timestamp != null
-                            ? '${timestamp.day}/${timestamp.month}/${timestamp.year} ${timestamp.hour.toString().padLeft(2, '0')}:${timestamp.minute.toString().padLeft(2, '0')}'
-                            : '-';
-                        return Card(
-                          child: ListTile(
-                            leading: const Icon(Icons.receipt_long, color: Color(0xFFFF4009)),
-                            title: Text('${AppLocalizations.of(context, 'ticket_count_label')}: ${data['ticket_count'] ?? 0}'),
-                            subtitle: Text('${AppLocalizations.of(context, 'round_time_label')}: ${data['round_time'] ?? '-'} | $dateStr'),
+                      children: [
+                        ...reports.map((doc) {
+                          final data = doc.data() as Map<String, dynamic>;
+                          final timestamp = (data['timestamp'] as Timestamp?)
+                              ?.toDate();
+                          final dateStr = timestamp != null
+                              ? '${timestamp.day}/${timestamp.month}/${timestamp.year} ${timestamp.hour.toString().padLeft(2, '0')}:${timestamp.minute.toString().padLeft(2, '0')}'
+                              : '-';
+                          return Card(
+                            child: ListTile(
+                              leading: const Icon(
+                                Icons.receipt_long,
+                                color: Color(0xFFFF4009),
+                              ),
+                              title: Text(
+                                '${AppLocalizations.of(context, 'ticket_count_label')}: ${data['ticket_count'] ?? 0}',
+                              ),
+                              subtitle: Text(
+                                '${AppLocalizations.of(context, 'round_time_label')}: ${data['round_time'] ?? '-'} | $dateStr',
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                        if (allDocs.length > 3)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 8.0),
+                            child: TextButton(
+                              onPressed: () {
+                                setState(() {
+                                  _showAllReports = !_showAllReports;
+                                });
+                              },
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    _showAllReports
+                                        ? AppLocalizations.of(
+                                            context,
+                                            'show_less_reports',
+                                          )
+                                        : AppLocalizations.of(
+                                            context,
+                                            'view_all_reports',
+                                          ),
+                                    style: const TextStyle(
+                                      color: Color(0xFFFF4009),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Icon(
+                                    _showAllReports
+                                        ? Icons.keyboard_arrow_up
+                                        : Icons.keyboard_arrow_down,
+                                    size: 20,
+                                    color: const Color(0xFFFF4009),
+                                  ),
+                                ],
+                              ),
+                            ),
                           ),
-                        );
-                      }).toList(),
+                      ],
                     );
                   },
                 );

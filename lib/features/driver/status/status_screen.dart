@@ -144,7 +144,7 @@ class _StatusScreenState extends State<StatusScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('เกิดข้อผิดพลาด: ${e.toString()}'),
+            content: Text('${AppLocalizations.of(context, 'error_prefix')}: ${e.toString()}'),
             backgroundColor: Colors.red,
           ),
         );

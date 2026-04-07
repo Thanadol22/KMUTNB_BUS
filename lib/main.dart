@@ -27,15 +27,18 @@ void main() async {
         rethrow;
       }
     }
-    
+
     // ไม่ให้ NotificationService บล็อกการรันแอป ถ้ารอฟรีสัพพลายเออร์นานไป
     NotificationService().init().catchError((e) {
       debugPrint("NotificationService init error: $e");
     });
 
-    // Auto-seed ตารางเดินรถ ใน Background (ไม่บล็อกการเริ่มแอพ)
+    // Auto-seed ข้อมูลเบื้องต้นใน Backgroundพื้นฐาน
     DatabaseService().seedSchedules().catchError((e) {
       debugPrint("Error seeding schedules: $e");
+    });
+    DatabaseService().seedLocations().catchError((e) {
+      debugPrint("Error seeding locations: $e");
     });
 
     runApp(

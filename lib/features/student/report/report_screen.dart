@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../core/services/firebase_auth.dart';
+import '../../../core/utils/app_localizations.dart';
 
 class ReportScreen extends StatefulWidget {
   const ReportScreen({Key? key}) : super(key: key);
@@ -47,8 +48,8 @@ class _ReportScreenState extends State<ReportScreen> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('ส่งรายงานความร้องเรียนสำเร็จ'),
+          SnackBar(
+            content: Text(AppLocalizations.of(context, 'report_success')),
             backgroundColor: Colors.green,
           ),
         );
@@ -80,7 +81,7 @@ class _ReportScreenState extends State<ReportScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('แจ้งปัญหาการใช้บริการ'),
+        title: Text(AppLocalizations.of(context, 'report_issue_title')),
         backgroundColor: Color(0xFFFF4009),
         foregroundColor: Colors.white,
       ),
@@ -91,18 +92,18 @@ class _ReportScreenState extends State<ReportScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'หัวข้อปัญหา',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              Text(
+                AppLocalizations.of(context, 'issue_topic'),
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
               ),
               const SizedBox(height: 8),
               DropdownButtonFormField<String>(
                 value: _selectedIssue,
-                items: const [
-                  DropdownMenuItem(value: 'late', child: Text('รถไม่มาตรงเวลา')),
-                  DropdownMenuItem(value: 'driver', child: Text('พฤติกรรมพนักงานขับรถ')),
-                  DropdownMenuItem(value: 'app', child: Text('แอปพลิเคชันมีปัญหา')),
-                  DropdownMenuItem(value: 'other', child: Text('อื่นๆ')),
+                items: [
+                  DropdownMenuItem(value: 'late', child: Text(AppLocalizations.of(context, 'issue_late'))),
+                  DropdownMenuItem(value: 'driver', child: Text(AppLocalizations.of(context, 'issue_driver'))),
+                  DropdownMenuItem(value: 'app', child: Text(AppLocalizations.of(context, 'issue_app'))),
+                  DropdownMenuItem(value: 'other', child: Text(AppLocalizations.of(context, 'issue_other'))),
                 ],
                 onChanged: (value) {
                   setState(() {
@@ -114,13 +115,13 @@ class _ReportScreenState extends State<ReportScreen> {
                     borderRadius: BorderRadius.circular(8),
                   ),
                 ),
-                hint: const Text('เลือกปัญหาที่พบ'),
-                validator: (value) => value == null ? 'กรุณาเลือกหัวข้อปัญหา' : null,
+                hint: Text(AppLocalizations.of(context, 'select_issue_hint')),
+                validator: (value) => value == null ? AppLocalizations.of(context, 'issue_required') : null,
               ),
               const SizedBox(height: 16),
-              const Text(
-                'รายละเอียดเพิ่มเติม',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              Text(
+                AppLocalizations.of(context, 'additional_details'),
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
               ),
               const SizedBox(height: 8),
               TextFormField(
@@ -130,11 +131,11 @@ class _ReportScreenState extends State<ReportScreen> {
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  hintText: 'อธิบายปัญหาที่พบเพิ่มเติม...',
+                  hintText: AppLocalizations.of(context, 'details_hint'),
                 ),
                 validator: (value) {
                   if (value == null || value.isEmpty) {
-                    return 'กรุณากรอกรายละเอียด';
+                    return AppLocalizations.of(context, 'details_required');
                   }
                   return null;
                 },
@@ -154,7 +155,7 @@ class _ReportScreenState extends State<ReportScreen> {
                   onPressed: _isSubmitting ? null : _submitReport,
                   child: _isSubmitting
                       ? const CircularProgressIndicator(color: Colors.white)
-                      : const Text('ส่งรายงาน', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                      : Text(AppLocalizations.of(context, 'submit_report'), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                 ),
               ),
             ],

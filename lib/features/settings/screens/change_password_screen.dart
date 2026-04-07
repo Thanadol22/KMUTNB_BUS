@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/services/firebase_auth.dart';
 import '../../auth/widgets/custom_text_field.dart';
+import '../../../core/utils/app_localizations.dart';
 
 class ChangePasswordScreen extends StatefulWidget {
   const ChangePasswordScreen({Key? key}) : super(key: key);
@@ -21,7 +22,10 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
 
     if (_newPasswordController.text != _confirmPasswordController.text) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('รหัสผ่านใหม่ไม่ตรงกัน'), backgroundColor: Colors.red),
+        SnackBar(
+          content: Text(AppLocalizations.of(context, 'password_mismatch')),
+          backgroundColor: Colors.red,
+        ),
       );
       return;
     }
@@ -39,15 +43,18 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('เปลี่ยนรหัสผ่านเรียบร้อยแล้ว'), backgroundColor: Colors.green),
+          SnackBar(
+            content: Text(AppLocalizations.of(context, 'password_changed_success')),
+            backgroundColor: Colors.green,
+          ),
         );
         Navigator.pop(context);
       }
     } catch (e) {
       if (mounted) {
-        String errMsg = 'เกิดข้อผิดพลาดในการเปลี่ยนรหัสผ่าน';
+        String errMsg = AppLocalizations.of(context, 'password_change_error');
         if (e.toString().contains('incorrect_current_password')) {
-          errMsg = 'รหัสผ่านปัจจุบันไม่ถูกต้อง';
+          errMsg = AppLocalizations.of(context, 'incorrect_current_password');
         }
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(errMsg), backgroundColor: Colors.red),
@@ -66,8 +73,8 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('เปลี่ยนรหัสผ่าน'),
-        backgroundColor: Color(0xFFFF4009),
+        title: Text(AppLocalizations.of(context, 'change_password')),
+        backgroundColor: const Color(0xFFFF4009),
         foregroundColor: Colors.white,
       ),
       body: SingleChildScrollView(
@@ -78,12 +85,12 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
             children: [
               CustomTextField(
                 controller: _currentPasswordController,
-                label: 'รหัสผ่านปัจจุบัน',
+                label: AppLocalizations.of(context, 'current_password'),
                 icon: Icons.lock_outline,
                 isPassword: true,
                 validator: (value) {
                   if (value == null || value.isEmpty) {
-                    return 'กรุณากรอกรหัสผ่านปัจจุบัน';
+                    return AppLocalizations.of(context, 'enter_current_password');
                   }
                   return null;
                 },
@@ -91,15 +98,15 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
               const SizedBox(height: 16),
               CustomTextField(
                 controller: _newPasswordController,
-                label: 'รหัสผ่านใหม่',
+                label: AppLocalizations.of(context, 'new_password'),
                 icon: Icons.lock,
                 isPassword: true,
                 validator: (value) {
                   if (value == null || value.isEmpty) {
-                    return 'กรุณากรอกรหัสผ่านใหม่';
+                    return AppLocalizations.of(context, 'enter_new_password');
                   }
                   if (value.length < 6) {
-                    return 'รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร';
+                    return AppLocalizations.of(context, 'password_min_length');
                   }
                   return null;
                 },
@@ -107,12 +114,12 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
               const SizedBox(height: 16),
               CustomTextField(
                 controller: _confirmPasswordController,
-                label: 'ยืนยันรหัสผ่านใหม่',
+                label: AppLocalizations.of(context, 'confirm_new_password'),
                 icon: Icons.lock,
                 isPassword: true,
                 validator: (value) {
                   if (value == null || value.isEmpty) {
-                    return 'กรุณายืนยันรหัสผ่านใหม่';
+                    return AppLocalizations.of(context, 'enter_confirm_password');
                   }
                   return null;
                 },
@@ -129,7 +136,13 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                   onPressed: _isSaving ? null : _changePassword,
                   child: _isSaving
                       ? const CircularProgressIndicator(color: Colors.white)
-                      : const Text('เปลี่ยนรหัสผ่าน', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                      : Text(
+                          AppLocalizations.of(context, 'change_password'),
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                 ),
               ),
             ],

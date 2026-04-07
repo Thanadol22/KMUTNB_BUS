@@ -30,7 +30,7 @@ class ScheduleScreen extends StatelessWidget {
             child: Column(
               children: [
                 Text(
-                  'ตารางเวลาวิ่งรถสองแถว',
+                  AppLocalizations.of(context, 'schedule_header'),
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
@@ -39,7 +39,7 @@ class ScheduleScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  'มจพ. วิทยาเขตปราจีนบุรี',
+                  AppLocalizations.of(context, 'campus_name'),
                   style: TextStyle(
                     fontSize: 14,
                     color: Color(0xCCFF4009),
@@ -63,13 +63,13 @@ class ScheduleScreen extends StatelessWidget {
                   columns: [
                     DataColumn(
                       label: Text(
-                        'รอบ',
+                        AppLocalizations.of(context, 'round'),
                         style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFFFF4009)),
                       ),
                     ),
-                    ...ScheduleData.stopNamesShort.map((name) => DataColumn(
+                    ...List.generate(ScheduleData.stopNamesShort.length, (index) => DataColumn(
                       label: Text(
-                        name,
+                        AppLocalizations.of(context, 'stop_short_${index + 1}'),
                         style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFFFF4009)),
                       ),
                     )),
@@ -143,7 +143,7 @@ class ScheduleScreen extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'ผู้รับผิดชอบ',
+                  AppLocalizations.of(context, 'responsible_person'),
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xE6FF4009)),
                 ),
                 const SizedBox(height: 4),
@@ -155,7 +155,7 @@ class ScheduleScreen extends StatelessWidget {
                       const SizedBox(width: 6),
                       Expanded(
                         child: Text(
-                          '${driver['name']}  โทร. ${driver['phone']}',
+                          '${driver['name']?.replaceAll('นาย', AppLocalizations.of(context, 'driver_prefix'))}  ${AppLocalizations.of(context, 'driver_phone')}. ${driver['phone']}',
                           style: const TextStyle(fontSize: 12),
                         ),
                       ),

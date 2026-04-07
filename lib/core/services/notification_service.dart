@@ -1,5 +1,6 @@
 import 'dart:developer';
 // import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/material.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
@@ -63,6 +64,8 @@ class NotificationService {
                 'high_importance_channel',
                 'High Importance Notifications',
                 importance: Importance.max,
+                icon: '@drawable/ic_notification',
+                color: const Color(0xFFFFFFFF),
               ),
             ),
             payload: message.data.toString(),
@@ -75,7 +78,7 @@ class NotificationService {
 
     // 5. ตั้งค่า Local Notification สำหรับการแสดงแจ้งเตือนตอนเปิดแอป (Foreground / จำลอง)
     const AndroidInitializationSettings androidInit =
-        AndroidInitializationSettings('@mipmap/ic_launcher');
+        AndroidInitializationSettings('@drawable/ic_notification');
     const DarwinInitializationSettings iosInit = DarwinInitializationSettings();
     const InitializationSettings initSettings = InitializationSettings(
       android: androidInit,
@@ -99,6 +102,8 @@ class NotificationService {
           'Local Testing',
           importance: Importance.max,
           priority: Priority.high,
+          icon: '@drawable/ic_notification',
+          color: const Color(0xFFFFFFFF),
         );
     const NotificationDetails platformDetails = NotificationDetails(
       android: androidDetails,
