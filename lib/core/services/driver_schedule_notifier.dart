@@ -85,13 +85,19 @@ class DriverScheduleNotifier {
         final targetMinute = int.tryParse(parts[1]);
         if (targetHour == null || targetMinute == null) continue;
 
-        final target = DateTime(
+        DateTime target = DateTime(
           now.year,
           now.month,
           now.day,
           targetHour,
           targetMinute,
         );
+
+        // ถ้าเวลาเป้าหมาย (เช่น ออกรถ 08:00) ผ่านไปแล้วของวันนี้
+        // ให้เลื่อนไปเป็น 08:00 ของวันพรุ่งนี้แทน เพื่อให้การแจ้งเตือนทำงานในวันถัดไปเมื่อปิดแอป
+        if (target.isBefore(now)) {
+          target = target.add(const Duration(days: 1));
+        }
 
         final routeName = data['route_name'] ?? '';
         final endTime = data['end_time'] ?? '';

@@ -81,7 +81,6 @@ class NotificationService {
       log('Firebase Messaging ยังไม่ได้ถูกตั้งค่า (รอเชื่อม Database): $e');
     }
 
-    // 5. ตั้งค่า Local Notification สำหรับการแสดงแจ้งเตือนตอนเปิดแอป (Foreground / จำลอง)
     const AndroidInitializationSettings androidInit =
         AndroidInitializationSettings('@drawable/ic_notification');
     const DarwinInitializationSettings iosInit = DarwinInitializationSettings();
@@ -97,6 +96,16 @@ class NotificationService {
         // TODO: นำทางเมื่อกดแจ้งเตือน
       },
     );
+
+    // Explicitly request permissions for Local Notifications on Android 13+ and Exact Alarms on 12+
+    final AndroidFlutterLocalNotificationsPlugin? androidImplementation =
+        _localNotifications.resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>();
+    
+    if (androidImplementation != null) {
+      await androidImplementation.requestNotificationsPermission();
+      await androidImplementation.requestExactAlarmsPermission();
+    }
   }
 
   // ฟังก์ชันจำลองการแจ้งเตือนแบบ Local (ไว้ใช้ทดสอบการทำงานของ Local Notification)
