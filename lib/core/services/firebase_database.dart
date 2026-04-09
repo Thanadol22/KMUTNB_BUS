@@ -112,11 +112,18 @@ class DatabaseService {
 
   /// เพิ่มข้อมูลตารางเดินรถ 21 รอบเข้า Firestore (เรียกครั้งเดียว)
   Future<void> seedSchedules() async {
-    // ตรวจสอบว่ามีข้อมูลแล้วหรือยัง
-    final existing = await _firestore.collection('schedules').limit(1).get();
-    if (existing.docs.isNotEmpty) {
-      return; // มีข้อมูลอยู่แล้ว ไม่ต้อง seed
+    // ตรวจสอบว่ามีข้อมูลรอบตรงกับ 21 รอบหรือไม่
+    final existing = await _firestore.collection('schedules').get();
+    if (existing.docs.length == 21) {
+      return; // มีข้อมูล 21 รอบอยู่แล้ว ไม่ต้อง seed ใหม่
     }
+
+    // ลบข้อมูลเดิมทิ้งก่อน
+    final deleteBatch = _firestore.batch();
+    for (var doc in existing.docs) {
+      deleteBatch.delete(doc.reference);
+    }
+    await deleteBatch.commit();
 
     const startTimes = [
       '08:00',

@@ -3,7 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../core/services/firebase_auth.dart';
 import '../../../core/services/firebase_database.dart';
 import '../../../core/utils/app_localizations.dart';
-import '../../../core/utils/schedule_data.dart';
+import '../../../models/schedule_model.dart';
 import '../../../models/ticket_report.dart';
 
 class TicketScreen extends StatefulWidget {
@@ -13,29 +13,23 @@ class TicketScreen extends StatefulWidget {
   State<TicketScreen> createState() => _TicketScreenState();
 }
 
-class _TicketScreenState extends State<TicketScreen> {
+  class _TicketScreenState extends State<TicketScreen> {
   final TextEditingController _ticketCountController = TextEditingController();
   final DatabaseService _dbService = DatabaseService();
-  int? _selectedRoundIndex;
+  ScheduleModel? _selectedRound;
   String? _busId;
   bool _isSubmitting = false;
-  List<int> _nearbyRounds = [];
+  List<ScheduleModel> _allRounds = [];
   bool _showAllReports = false;
 
   @override
   void initState() {
     super.initState();
-    _initAutoRound();
+    _initData();
   }
 
-  Future<void> _initAutoRound() async {
+  Future<void> _initData() async {
     try {
-      // หารอบใกล้เคียงจากเวลาปัจจุบัน
-      final now = DateTime.now();
-      final nearbyRounds = ScheduleData.getNearbyRounds(now);
-      final nearestRound = ScheduleData.findNearestRound(now);
-
-      // หา bus_id ของคนขับ
       final uid = await AuthService.getCurrentUserId();
       String? busId;
       if (uid != null) {
@@ -47,10 +41,63 @@ class _TicketScreenState extends State<TicketScreen> {
         }
       }
 
+      final rawSchedules = await _dbService.getSchedulesList();
+      
+      final Map<String, ScheduleModel> deduped = {};
+      for (var s in rawSchedules) {
+         if (!deduped.containsKey(s.startTime)) {
+           deduped[s.startTime] = s;
+         }
+      }
+      final schedules = deduped.values.toList();
+      schedules.sort((a, b) => a.startTime.compareTo(b.startTime));
+
+      final now = DateTime.now();
+      int nearestIndex = -1;
+      int bestDiff = 999999;
+      final nowMinutes = now.hour * 60 + now.minute;
+
+      for (int i = 0; i < schedules.length; i++) {
+        final startParts = schedules[i].startTime.split(':');
+        if (startParts.length < 2) continue;
+        final roundMinutes = int.parse(startParts[0]) * 60 + int.parse(startParts[1]);
+        
+        final endParts = schedules[i].endTime.split(':');
+        final endMinutes = endParts.length >= 2 
+            ? int.parse(endParts[0]) * 60 + int.parse(endParts[1]) 
+            : roundMinutes + 25;
+
+        int diff = (roundMinutes - nowMinutes).abs();
+
+        if (nowMinutes >= roundMinutes && nowMinutes <= endMinutes) {
+          nearestIndex = i;
+          break;
+        }
+        if (roundMinutes > nowMinutes) {
+          if (diff < bestDiff) {
+            bestDiff = diff;
+            nearestIndex = i;
+          }
+        }
+      }
+
+      if (nearestIndex == -1 && schedules.isNotEmpty) {
+        for (int i = schedules.length - 1; i >= 0; i--) {
+          final startParts = schedules[i].startTime.split(':');
+          if (startParts.length < 2) continue;
+          final roundMinutes = int.parse(startParts[0]) * 60 + int.parse(startParts[1]);
+          if (roundMinutes <= nowMinutes) {
+            nearestIndex = i;
+            break;
+          }
+        }
+        if (nearestIndex == -1) nearestIndex = 0;
+      }
+
       if (mounted) {
         setState(() {
-          _nearbyRounds = nearbyRounds;
-          _selectedRoundIndex = nearestRound;
+          _allRounds = schedules;
+          _selectedRound = nearestIndex != -1 ? schedules[nearestIndex] : (schedules.isNotEmpty ? schedules[0] : null);
           _busId = busId;
         });
       }
@@ -81,7 +128,7 @@ class _TicketScreenState extends State<TicketScreen> {
       return;
     }
 
-    if (_selectedRoundIndex == null) {
+    if (_selectedRound == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(AppLocalizations.of(context, 'select_round_time')),
@@ -98,7 +145,7 @@ class _TicketScreenState extends State<TicketScreen> {
       final uid = await AuthService.getCurrentUserId();
       if (uid == null) throw Exception('No user logged in');
 
-      final roundTime = ScheduleData.roundStartTimes[_selectedRoundIndex!];
+      final roundTime = _selectedRound!.startTime;
 
       final report = TicketReportModel(
         reportId: '',
@@ -256,21 +303,21 @@ class _TicketScreenState extends State<TicketScreen> {
             const SizedBox(height: 8),
 
             // Dropdown แสดงรอบใกล้เคียง
-            DropdownButtonFormField<int>(
-              value: _selectedRoundIndex,
+            DropdownButtonFormField<ScheduleModel>(
+              value: _selectedRound,
               isExpanded: true,
-              items: _nearbyRounds.map((roundIndex) {
-                final startTime = ScheduleData.roundStartTimes[roundIndex];
-                final endTime = ScheduleData.roundEndTimes[roundIndex];
-                final roundNum = roundIndex + 1;
+              items: _allRounds.map((round) {
+                final startTime = round.startTime;
+                final endTime = round.endTime;
+                final roundNum = _allRounds.indexOf(round) + 1;
 
                 // ตรวจสอบว่าเป็นรอบปัจจุบันหรือไม่
                 final startParts = startTime.split(':');
                 final startMin =
                     int.parse(startParts[0]) * 60 + int.parse(startParts[1]);
                 final endParts = endTime.split(':');
-                final endMin =
-                    int.parse(endParts[0]) * 60 + int.parse(endParts[1]);
+                final endMin = endParts.length >= 2 ?
+                    int.parse(endParts[0]) * 60 + int.parse(endParts[1]) : startMin + 25;
 
                 String label =
                     '${AppLocalizations.of(context, 'round_label_short')} $roundNum ($startTime - $endTime)';
@@ -285,8 +332,8 @@ class _TicketScreenState extends State<TicketScreen> {
                   label += ' (${AppLocalizations.of(context, 'round_passed')})';
                 }
 
-                return DropdownMenuItem<int>(
-                  value: roundIndex,
+                return DropdownMenuItem<ScheduleModel>(
+                  value: round,
                   child: Text(
                     label,
                     style: TextStyle(
@@ -303,7 +350,7 @@ class _TicketScreenState extends State<TicketScreen> {
               }).toList(),
               onChanged: (value) {
                 setState(() {
-                  _selectedRoundIndex = value;
+                  _selectedRound = value;
                 });
               },
               decoration: InputDecoration(
@@ -314,24 +361,6 @@ class _TicketScreenState extends State<TicketScreen> {
                   Icons.access_time,
                   color: Color(0xFFFF4009),
                 ),
-              ),
-            ),
-
-            // ปุ่มดูทุกรอบ
-            Align(
-              alignment: Alignment.centerRight,
-              child: TextButton.icon(
-                icon: const Icon(Icons.list, size: 18),
-                label: Text(AppLocalizations.of(context, 'show_all_rounds')),
-                onPressed: () {
-                  setState(() {
-                    // แสดงทุกรอบ
-                    _nearbyRounds = List.generate(
-                      ScheduleData.roundStartTimes.length,
-                      (i) => i,
-                    );
-                  });
-                },
               ),
             ),
 

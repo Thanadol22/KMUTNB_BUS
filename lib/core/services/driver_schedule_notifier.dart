@@ -106,8 +106,8 @@ class DriverScheduleNotifier {
         // ======= แจ้งเตือนก่อน 15 นาที =======
         final fifteenMinTarget = target.subtract(const Duration(minutes: 15));
         if (fifteenMinTarget.isAfter(now)) {
-            final int id15 = '${scheduleKey}_15min'.hashCode;
-            NotificationService().scheduleNotification(
+            final int id15 = ('${scheduleKey}_15min'.hashCode).abs() % 2147483647;
+            await NotificationService().scheduleNotification(
               id: id15,
               title: '⏰ อีก 15 นาทีถึงรอบรถ!',
               body: 'รอบ $startTime - $endTime ($routeName)\nเตรียมตัวออกรถได้เลย!',
@@ -117,8 +117,8 @@ class DriverScheduleNotifier {
 
         // ======= แจ้งเตือนเมื่อถึงเวลาออกรถ =======
         if (target.isAfter(now)) {
-            final int idDepart = '${scheduleKey}_depart'.hashCode;
-            NotificationService().scheduleNotification(
+            final int idDepart = ('${scheduleKey}_depart'.hashCode).abs() % 2147483647;
+            await NotificationService().scheduleNotification(
               id: idDepart,
               title: '🚌 ถึงเวลาออกรถแล้ว!',
               body: 'รอบ $startTime - $endTime ($routeName)\nออกรถได้เลย!',
@@ -131,3 +131,5 @@ class DriverScheduleNotifier {
     }
   }
 }
+
+

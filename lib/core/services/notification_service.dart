@@ -2,15 +2,17 @@ import 'dart:developer';
 // import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:firebase_core/firebase_core.dart'; // เพิ่มกลับมา
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
+import 'package:permission_handler/permission_handler.dart';
+
 // ต้องอยู่ระดับ top-level (นอกคลาส) เพื่อให้ทำงานตอนแอปปิดได้
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  // ไม่บังคับต้อง Initialize Firebase ถ้าเราไม่ได้ใช้งาน Service อื่นๆ ของ Firebase ในนี้
-  // ถ้ายกเลิกคอมเมนต์ต้องมั่นใจว่าเชื่อมต่อ Firebase เรียบร้อยแล้ว
-  // await Firebase.initializeApp();
+  // บังคับ Initialize Firebase เพื่อให้การรับข้อความจาก Background ทำงานได้สมบูรณ์
+  await Firebase.initializeApp();
 
   log("Handling a background message: ${message.messageId}");
   // TODO: เตรียมสำหรับการอัปเดตข้อมูลสถิติหรือฐานข้อมูลเวลาแอปทำงานเบื้องหลัง
@@ -105,6 +107,13 @@ class NotificationService {
     if (androidImplementation != null) {
       await androidImplementation.requestNotificationsPermission();
       await androidImplementation.requestExactAlarmsPermission();
+      
+      // ขอสิทธิ์ Unrestricted Battery บน Android เพื่อไม่ให้ OS ลบ Scheduled Notification ตอนปัดแอปทิ้ง
+      final isBatteryOptimizationIgnored = await Permission.ignoreBatteryOptimizations.isGranted;
+      if (!isBatteryOptimizationIgnored) {
+        log('Requesting ignoreBatteryOptimizations permission...');
+        await Permission.ignoreBatteryOptimizations.request();
+      }
     }
   }
 
@@ -172,4 +181,5 @@ class NotificationService {
     );
     log("Scheduled notification id: $id at $tzScheduledDate");
   }
+
 }
