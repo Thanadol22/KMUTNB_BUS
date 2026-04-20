@@ -77,6 +77,11 @@ class DatabaseService {
     return _firestore.collection('schedules').snapshots();
   }
 
+  /// Stream ตารางเดินรถละเอียดจาก collection detailed_schedules
+  Stream<QuerySnapshot> getDetailedSchedulesStream() {
+    return _firestore.collection('detailed_schedules').orderBy('round').snapshots();
+  }
+
   /// ดึง schedules สำหรับรถคันที่กำหนด
   Stream<QuerySnapshot> getSchedulesForBus(String busId) {
     return _firestore

@@ -3,26 +3,12 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../core/utils/app_localizations.dart';
 import '../../../core/utils/schedule_data.dart';
 import '../../../core/services/firebase_database.dart';
-import '../../../models/schedule_model.dart';
+import '../../../models/detailed_schedule_model.dart';
 
 class ScheduleScreen extends StatelessWidget {
   const ScheduleScreen({Key? key}) : super(key: key);
 
-  List<String> _getStopTimes(String startTime) {
-    if (startTime.isEmpty) return [];
-    final startParts = startTime.split(':');
-    final startHour = int.parse(startParts[0]);
-    final startMinute = int.parse(startParts[1]);
-
-    return ScheduleData.stopOffsets.map((offset) {
-      int totalMinutes = startHour * 60 + startMinute + offset;
-      int hour = (totalMinutes ~/ 60) % 24;
-      int minute = totalMinutes % 60;
-      return '${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}';
-    }).toList();
-  }
-
-  int _findCurrentRoundIndex(List<ScheduleModel> schedules, DateTime now) {
+  int _findCurrentRoundIndex(List<DetailedScheduleModel> schedules, DateTime now) {
     if (schedules.isEmpty) return -1;
     final nowMinutes = now.hour * 60 + now.minute;
 
@@ -92,7 +78,7 @@ class ScheduleScreen extends StatelessWidget {
           // ตารางเวลา
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
-              stream: dbService.getSchedulesStream(),
+              stream: dbService.getDetailedSchedulesStream(),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator(color: Color(0xFFFF4009)));
@@ -106,13 +92,13 @@ class ScheduleScreen extends StatelessWidget {
                   );
                 }
 
-                // Map docs to ScheduleModel and sort by start_time
+                // Map docs to DetailedScheduleModel and sort by start_time
                 final schedules = snapshot.data!.docs
-                    .map((doc) => ScheduleModel.fromFirestore(doc))
+                    .map((doc) => DetailedScheduleModel.fromFirestore(doc))
                     .toList();
                 
                 // Deduplicate by startTime in case db returns multiple overlapping schedules
-                final Map<String, ScheduleModel> deduped = {};
+                final Map<String, DetailedScheduleModel> deduped = {};
                 for (var s in schedules) {
                    if (!deduped.containsKey(s.startTime)) {
                      deduped[s.startTime] = s;
@@ -148,7 +134,20 @@ class ScheduleScreen extends StatelessWidget {
                       ],
                       rows: List.generate(uniqueSchedules.length, (index) {
                         final schedule = uniqueSchedules[index];
-                        final stopTimes = _getStopTimes(schedule.startTime);
+                        final stopTimes = List.generate(ScheduleData.stopNamesShort.length, (stopIndex) {
+                          final stop = schedule.stops.firstWhere(
+                            (s) => s.order == stopIndex + 1,
+                            orElse: () => DetailedStopModel(
+                              order: stopIndex + 1,
+                              locationId: '',
+                              name: '',
+                              time: '-',
+                              lat: 0.0,
+                              lng: 0.0,
+                            ),
+                          );
+                          return stop.time.isNotEmpty ? stop.time : '-';
+                        });
                         final isCurrentRound = index == currentRound;
 
                         // ตรวจว่ารอบนี้ผ่านไปแล้วหรือยัง
