@@ -5,7 +5,6 @@ import '../../../core/services/firebase_auth.dart';
 import '../../../core/services/firebase_database.dart';
 import '../../../core/utils/app_localizations.dart';
 import '../../../core/services/notification_service.dart';
-import '../../../core/services/driver_schedule_notifier.dart';
 
 class NotificationScreen extends StatefulWidget {
   const NotificationScreen({Key? key}) : super(key: key);
@@ -16,7 +15,6 @@ class NotificationScreen extends StatefulWidget {
 
 class _NotificationScreenState extends State<NotificationScreen> {
   final DatabaseService _dbService = DatabaseService();
-  final DriverScheduleNotifier _notifier = DriverScheduleNotifier();
   String? _busId;
   Timer? _uiRefreshTimer;
 
@@ -264,42 +262,41 @@ class _NotificationScreenState extends State<NotificationScreen> {
             ),
           ),
 
-          // ======= ข้อมูลการแจ้งเตือน =======
-          if (_notifier.isRunning)
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              decoration: BoxDecoration(
-                color: isDark
-                    ? Colors.orange.shade900.withOpacity(0.3)
-                    : Colors.orange.shade50,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: Colors.orange.shade300.withOpacity(0.5),
-                ),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.info_outline,
-                    color: Colors.orange.shade700,
-                    size: 20,
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      AppLocalizations.of(context, 'notification_info'),
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: isDark
-                            ? Colors.orange.shade200
-                            : Colors.orange.shade800,
-                      ),
-                    ),
-                  ),
-                ],
+          // ======= ข้อมูลการแจ้งเตือน (FCM Server-side) =======
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: isDark
+                  ? Colors.green.shade900.withOpacity(0.3)
+                  : Colors.green.shade50,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: Colors.green.shade300.withOpacity(0.5),
               ),
             ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.cloud_done,
+                  color: Colors.green.shade700,
+                  size: 20,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    AppLocalizations.of(context, 'notification_info'),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: isDark
+                          ? Colors.green.shade200
+                          : Colors.green.shade800,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
 
           const SizedBox(height: 4),
 
@@ -569,8 +566,8 @@ class _NotificationScreenState extends State<NotificationScreen> {
                             ),
                           ),
                         ),
-                      // แสดงแท็กสถานะการแจ้งเตือน
-                      if (_notifier.isRunning && (upcoming || urgent))
+                      // แสดงแท็กสถานะการแจ้งเตือน (FCM จาก Server)
+                      if (upcoming || urgent)
                         Padding(
                           padding: const EdgeInsets.only(top: 6),
                           child: Row(

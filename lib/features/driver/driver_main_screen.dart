@@ -4,7 +4,6 @@ import 'status/status_screen.dart';
 import 'tickets/ticket_screen.dart';
 import 'notifications/notification_screen.dart';
 import '../settings/screens/settings_screen.dart';
-import '../../../core/services/driver_schedule_notifier.dart';
 
 class DriverMainScreen extends StatefulWidget {
   const DriverMainScreen({Key? key}) : super(key: key);
@@ -16,12 +15,6 @@ class DriverMainScreen extends StatefulWidget {
 class _DriverMainScreenState extends State<DriverMainScreen> {
   int _currentIndex = 0;
 
-  @override
-  void initState() {
-    super.initState();
-    // เริ่มทำงานระบบแจ้งเตือนอัตโนมัติเมื่อเปิดหน้าหลักคนขับ
-    DriverScheduleNotifier().start();
-  }
 
   final List<Widget> _pages = [
     const StatusScreen(),

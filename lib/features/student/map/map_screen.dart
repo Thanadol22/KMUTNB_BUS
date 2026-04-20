@@ -8,8 +8,11 @@ import 'dart:async';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../../../core/utils/app_localizations.dart';
+import '../../../core/utils/localization_provider.dart';
 import '../../../models/location_model.dart';
 import '../../../core/services/firebase_database.dart';
+import '../../../core/services/eta_service.dart';
+import 'package:provider/provider.dart';
 
 class MapScreen extends StatefulWidget {
   const MapScreen({Key? key}) : super(key: key);
@@ -30,6 +33,7 @@ class _MapScreenState extends State<MapScreen> {
   List<Map<String, dynamic>> _schedulesCache = [];
 
   String? _selectedBusId;
+  String? _selectedLocationId;
   LatLng? _lastFollowedPos;
 
   // ===== Cached Streams =====
@@ -230,155 +234,25 @@ class _MapScreenState extends State<MapScreen> {
     String boardDate,
     String boardTime,
   ) {
-    // ตรวจสอบความสดใหม่ของข้อมูล (Staleness Check)
-    bool isStale = false;
-    try {
-      final partsDate = boardDate.split('/');
-      final partsTime = boardTime.split(':');
-      if (partsDate.length == 3 && partsTime.length == 3) {
-        // สมมติ fomat วันที่จากบอร์ดเป็น d/m/y
-        final boardDT = DateTime(
-          int.parse(partsDate[2]),
-          int.parse(partsDate[1]),
-          int.parse(partsDate[0]),
-          int.parse(partsTime[0]),
-          int.parse(partsTime[1]),
-          int.parse(partsTime[2]),
-        );
-        final diff = DateTime.now().difference(boardDT).inMinutes;
-        if (diff.abs() > 10) isStale = true; // ถ้าข้อมูลเก่าเกิน 10 นาที
-      }
-    } catch (_) {
-      isStale = true;
-    }
+    // ดึง locale ปัจจุบันสำหรับ format ETA
+    final locale = Provider.of<LocalizationProvider>(
+      context,
+      listen: false,
+    ).locale.languageCode;
 
-    if (activeRound == null || isStale) {
-      return {
-        'round': isStale ? 'ข้อมูลไม่อัปเดต' : '-',
-        'currentStop': isStale ? 'GPS ขาดการติดต่อ' : 'นอกเวลาวิ่ง',
-        'nextStop': '-',
-        'etaText': '-',
-      };
-    }
+    // เรียกใช้ EtaService ที่ปรับปรุงแล้ว (spatial-based)
+    final result = EtaService.compute(
+      busLat: busLocation.latitude,
+      busLng: busLocation.longitude,
+      speedKmh: speedKmh,
+      firestoreLocations: _locations,
+      activeRound: activeRound,
+      boardDate: boardDate,
+      boardTime: boardTime,
+      locale: locale,
+    );
 
-    final routeSequence = [
-      {'name': 'หอพักฯ', 'id': 'loc_dorm_male'},
-      {'name': 'หน้า ม.', 'id': 'loc_uni_front'},
-      {'name': 'บริหารฯ', 'id': 'loc_faculty_bus'},
-      {'name': 'อุตฯ', 'id': 'loc_faculty_agri'},
-      {'name': 'อาคาร', 'id': 'loc_building_adm'},
-      {'name': 'เทคโนฯ', 'id': 'loc_faculty_tech'},
-      {'name': 'วิศวะฯ', 'id': 'loc_faculty_eng'},
-    ];
-
-    if (_locations.isEmpty) {
-      return {
-        'round': '-',
-        'currentStop': '-',
-        'nextStop': '-',
-        'etaText': '-',
-      };
-    }
-
-    int bestIndex = 0;
-    double minSum = double.infinity;
-    double distToCurrentStop = 0;
-    double distToNextStop = 0;
-
-    for (int i = 0; i < routeSequence.length - 1; i++) {
-      var loc1List = _locations
-          .where((l) => l.id == routeSequence[i]['id']!)
-          .toList();
-      var loc2List = _locations
-          .where((l) => l.id == routeSequence[i + 1]['id']!)
-          .toList();
-
-      if (loc1List.isEmpty || loc2List.isEmpty) continue;
-
-      var p1 = LatLng(loc1List.first.lat, loc1List.first.lng);
-      var p2 = LatLng(loc2List.first.lat, loc2List.first.lng);
-
-      const distance = Distance();
-      double d1 = distance.as(LengthUnit.Meter, busLocation, p1);
-      double d2 = distance.as(LengthUnit.Meter, busLocation, p2);
-      double sum = d1 + d2;
-
-      if (sum < minSum) {
-        minSum = sum;
-        bestIndex = i;
-        distToCurrentStop = d1;
-        distToNextStop = d2;
-      }
-    }
-
-    if (minSum == double.infinity) {
-      return {
-        'round': '-',
-        'currentStop': '-',
-        'nextStop': '-',
-        'etaText': '-',
-      };
-    }
-
-    String currentStopResult;
-    String nextStopResult;
-    String etaResult;
-
-    // ถ้าจอดนิ่ง (Speed 0) ให้ปรับพยากรณ์ให้เผื่อเวลามากขึ้น
-    double effectiveSpeedKmh = (speedKmh > 5.0) ? speedKmh : 15.0;
-    double speedMetersPerMinute = effectiveSpeedKmh * (1000 / 60);
-
-    if (distToCurrentStop < 50) {
-      currentStopResult = routeSequence[bestIndex]['name']!;
-      nextStopResult = routeSequence[bestIndex + 1]['name']!;
-      int minutes = (distToNextStop / speedMetersPerMinute).round();
-      if (speedKmh < 2.0) minutes += 2; // ถ้าจอดอยู่ให้ + เวลาเผื่อ
-      etaResult = (minutes <= 0)
-          ? AppLocalizations.of(context, 'arrived')
-          : '$minutes ${AppLocalizations.of(context, 'minutes')}';
-    } else if (distToNextStop < 50) {
-      currentStopResult = routeSequence[bestIndex + 1]['name']!;
-      if (bestIndex + 2 < routeSequence.length) {
-        nextStopResult = routeSequence[bestIndex + 2]['name']!;
-        var loc3List = _locations
-            .where((l) => l.id == routeSequence[bestIndex + 2]['id']!)
-            .toList();
-        if (loc3List.isNotEmpty) {
-          double d3 = const Distance().as(
-            LengthUnit.Meter,
-            busLocation,
-            LatLng(loc3List.first.lat, loc3List.first.lng),
-          );
-          int minutes = (d3 / speedMetersPerMinute).round();
-          if (speedKmh < 2.0) minutes += 2;
-          etaResult = (minutes <= 0)
-              ? AppLocalizations.of(context, 'arrived')
-              : '$minutes ${AppLocalizations.of(context, 'minutes')}';
-        } else {
-          etaResult = '-';
-        }
-      } else {
-        nextStopResult = 'สิ้นสุดรอบ';
-        etaResult = AppLocalizations.of(context, 'arrived');
-      }
-    } else {
-      currentStopResult =
-          'ระหว่าง ${routeSequence[bestIndex]['name']} กับ ${routeSequence[bestIndex + 1]['name']}';
-      nextStopResult = routeSequence[bestIndex + 1]['name']!;
-      int minutes = (distToNextStop / speedMetersPerMinute).round();
-      if (speedKmh < 2.0) minutes += 3;
-      if (minutes > 60) minutes = 60;
-      etaResult = (minutes <= 0)
-          ? AppLocalizations.of(context, 'arrived')
-          : '$minutes ${AppLocalizations.of(context, 'minutes')}';
-    }
-
-    return {
-      'round': '${activeRound['start_time']} - ${activeRound['end_time']}',
-      'currentStop': currentStopResult,
-      'nextStop': nextStopResult,
-      'etaText': etaResult,
-    };
+    return result.toMap();
   }
 
   /// ดึงข้อมูลจาก push ID ล่าสุด
@@ -508,7 +382,9 @@ class _MapScreenState extends State<MapScreen> {
                       final speed = _toDouble(busInfo['speed']) ?? 0.0;
 
                       // เก็บตำแหน่งรถที่เลือกไว้เพื่อใช้ในการ Follow
-                      if (_selectedBusId == busId && lat != null && lon != null) {
+                      if (_selectedBusId == busId &&
+                          lat != null &&
+                          lon != null) {
                         selectedBusLocation = LatLng(lat, lon);
                       }
 
@@ -538,11 +414,11 @@ class _MapScreenState extends State<MapScreen> {
                           );
 
                           if (now.isAfter(
-                                 start.subtract(const Duration(minutes: 10)),
-                               ) &&
-                               now.isBefore(
-                                 end.add(const Duration(minutes: 10)),
-                               )) {
+                                start.subtract(const Duration(minutes: 10)),
+                              ) &&
+                              now.isBefore(
+                                end.add(const Duration(minutes: 10)),
+                              )) {
                             if (activeRound == null) {
                               activeRound = s;
                             } else {
@@ -577,6 +453,7 @@ class _MapScreenState extends State<MapScreen> {
                         'currentStop': '-',
                         'nextStop': '-',
                         'etaText': '-',
+                        'etaAbsolute': '',
                       };
                       if (lat != null && lon != null) {
                         computedRouteInfo = _calculateRouteAndETA(
@@ -593,6 +470,8 @@ class _MapScreenState extends State<MapScreen> {
                       final nextStop = computedRouteInfo['nextStop'] ?? '-';
                       final round = computedRouteInfo['round'] ?? '-';
                       final boardEta = computedRouteInfo['etaText'] ?? '-';
+                      final etaAbsolute =
+                          computedRouteInfo['etaAbsolute'] ?? '';
 
                       final driverId = _getFirestoreDriverId(busId);
                       final firestoreStatus =
@@ -692,6 +571,7 @@ class _MapScreenState extends State<MapScreen> {
                             driverPhone: driverPhone,
                             firestoreStatus: firestoreStatus,
                             etaText: etaText,
+                            etaAbsolute: etaAbsolute,
                           ),
                         );
                       } else {
@@ -722,6 +602,11 @@ class _MapScreenState extends State<MapScreen> {
                         options: MapOptions(
                           initialCenter: centerLocation,
                           initialZoom: 16.0,
+                          onTap: (_, __) {
+                            if (_selectedLocationId != null) {
+                              setState(() => _selectedLocationId = null);
+                            }
+                          },
                           onMapEvent: (event) {
                             // ถ้าเหตุการณ์เกิดจากการกระทำของผู้ใช้ (ไม่ใช่โปรแกรมสั่ง move)
                             // ให้ยกเลิกการติดตาม (Unlock)
@@ -742,18 +627,79 @@ class _MapScreenState extends State<MapScreen> {
                           ),
                           MarkerLayer(
                             markers: [
-                              ..._locations.map(
-                                (building) => Marker(
+                              ..._locations.map((building) {
+                                final isSelected =
+                                    _selectedLocationId == building.id;
+                                return Marker(
                                   point: LatLng(building.lat, building.lng),
-                                  width: 40,
-                                  height: 40,
-                                  child: const Icon(
-                                    Icons.location_on,
-                                    color: Colors.red,
-                                    size: 30,
+                                  width: 120,
+                                  height: 80,
+                                  alignment: Alignment.topCenter,
+                                  child: GestureDetector(
+                                    onTap: () {
+                                      setState(() {
+                                        _selectedLocationId = building.id;
+                                      });
+                                    },
+                                    child: Stack(
+                                      alignment: Alignment.bottomCenter,
+                                      children: [
+                                        // Label
+                                        AnimatedOpacity(
+                                          duration: const Duration(
+                                            milliseconds: 300,
+                                          ),
+                                          opacity: isSelected ? 1.0 : 0.0,
+                                          child: Container(
+                                            margin: const EdgeInsets.only(
+                                              bottom: 35,
+                                            ),
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 8,
+                                              vertical: 4,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: Theme.of(
+                                                context,
+                                              ).cardColor,
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
+                                              boxShadow: [
+                                                BoxShadow(
+                                                  color: Colors.black
+                                                      .withValues(alpha: 0.1),
+                                                  blurRadius: 4,
+                                                  offset: const Offset(0, 2),
+                                                ),
+                                              ],
+                                              border: Border.all(
+                                                color: Colors.red.withValues(
+                                                  alpha: 0.5,
+                                                ),
+                                                width: 1,
+                                              ),
+                                            ),
+                                            child: Text(
+                                              building.name,
+                                              style: const TextStyle(
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                              textAlign: TextAlign.center,
+                                            ),
+                                          ),
+                                        ),
+                                        // Pin Icon
+                                        const Icon(
+                                          Icons.location_on,
+                                          color: Colors.red,
+                                          size: 32,
+                                        ),
+                                      ],
+                                    ),
                                   ),
-                                ),
-                              ),
+                                );
+                              }),
                               ...busMarkers,
                             ],
                           ),
@@ -970,9 +916,11 @@ class _MapScreenState extends State<MapScreen> {
     required String driverPhone,
     required String firestoreStatus,
     required String etaText,
+    String etaAbsolute = '',
   }) {
     final isSelected = _selectedBusId == busId;
     final dynamicStatusColor = _getFirestoreStatusColor(firestoreStatus);
+    final theme = Theme.of(context);
 
     return GestureDetector(
       onTap: () {
@@ -983,68 +931,79 @@ class _MapScreenState extends State<MapScreen> {
         _mapController.move(busLocation, 18.0);
       },
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 300),
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+        duration: const Duration(milliseconds: 350),
+        curve: Curves.easeInOutCubic,
+        margin: const EdgeInsets.only(bottom: 16),
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Theme.of(context).cardColor,
-          borderRadius: BorderRadius.circular(40),
-          border: Border.all(color: dynamicStatusColor, width: 2.2),
-          boxShadow: isSelected
-              ? [
-                  BoxShadow(
-                    color: dynamicStatusColor.withValues(alpha: 0.3),
-                    blurRadius: 10,
-                    spreadRadius: 2,
-                  ),
-                ]
-              : [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.05),
-                    blurRadius: 4,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            // ===== Icon =====
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: Theme.of(context).cardColor,
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.15),
-                    blurRadius: 6,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Icon(
-                Icons.directions_bus,
-                color: dynamicStatusColor,
-                size: 32,
-              ),
+          color: theme.cardColor,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(
+            color: isSelected
+                ? dynamicStatusColor
+                : dynamicStatusColor.withValues(alpha: 0.3),
+            width: isSelected ? 2.5 : 1.5,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: isSelected
+                  ? dynamicStatusColor.withValues(alpha: 0.25)
+                  : Colors.black.withValues(alpha: 0.06),
+              blurRadius: isSelected ? 16 : 8,
+              offset: const Offset(0, 4),
             ),
+          ],
+        ),
+        child: IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              // Left: Stylized Bus Icon
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      dynamicStatusColor,
+                      dynamicStatusColor.withValues(alpha: 0.7),
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(18),
+                  boxShadow: [
+                    BoxShadow(
+                      color: dynamicStatusColor.withValues(alpha: 0.3),
+                      blurRadius: 8,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: const Icon(
+                  Icons.directions_bus_rounded,
+                  color: Colors.white,
+                  size: 32,
+                ),
+              ),
+              const SizedBox(width: 16),
 
-            // ===== Info Column =====
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 14.0),
+              // Center: Bus Info & Next Stop
+              Expanded(
                 child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // Bus ID & Status Badge
                     Row(
                       children: [
                         Text(
                           busId,
                           style: TextStyle(
                             fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Theme.of(context).textTheme.bodyLarge?.color,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: -0.5,
+                            color: theme.textTheme.bodyLarge?.color,
                           ),
                         ),
                         const SizedBox(width: 8),
@@ -1052,11 +1011,15 @@ class _MapScreenState extends State<MapScreen> {
                           child: Container(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 8,
-                              vertical: 2,
+                              vertical: 3,
                             ),
                             decoration: BoxDecoration(
-                              color: dynamicStatusColor.withValues(alpha: 0.2),
-                              borderRadius: BorderRadius.circular(10),
+                              color: dynamicStatusColor.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: dynamicStatusColor.withValues(alpha: 0.2),
+                                width: 1,
+                              ),
                             ),
                             child: Text(
                               AppLocalizations.translateDbStatus(
@@ -1064,83 +1027,135 @@ class _MapScreenState extends State<MapScreen> {
                                 firestoreStatus,
                               ),
                               style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.bold,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800,
                                 color: dynamicStatusColor,
                               ),
                               overflow: TextOverflow.ellipsis,
-                              maxLines: 1,
                             ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+
+                    // Next Stop Label & Name
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.location_on_outlined,
+                          size: 16,
+                          color: theme.textTheme.bodyMedium?.color?.withValues(
+                            alpha: 0.5,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          AppLocalizations.of(context, 'next_stop'),
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: theme.textTheme.bodyMedium?.color
+                                ?.withValues(alpha: 0.5),
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 1),
                     Text(
-                      '${AppLocalizations.of(context, 'driver')}: $driverName',
+                      nextStop,
                       style: TextStyle(
                         fontSize: 15,
-                        fontWeight: FontWeight.w500,
-                        color: Theme.of(
-                          context,
-                        ).textTheme.bodyMedium?.color?.withValues(alpha: 0.7),
+                        fontWeight: FontWeight.w700,
+                        color: theme.textTheme.bodyLarge?.color,
                       ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
+                    const SizedBox(height: 6),
+
+                    // Plate & Driver (Subtle)
                     Text(
-                      '${AppLocalizations.of(context, 'driver_phone')}: $driverPhone',
+                      '$licensePlate • $driverName',
                       style: TextStyle(
-                        fontSize: 15,
+                        fontSize: 12,
+                        color: theme.textTheme.bodyMedium?.color?.withValues(
+                          alpha: 0.6,
+                        ),
                         fontWeight: FontWeight.w500,
-                        color: Theme.of(
-                          context,
-                        ).textTheme.bodyMedium?.color?.withValues(alpha: 0.7),
                       ),
-                    ),
-                    Text(
-                      licensePlate,
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w500,
-                        color: Theme.of(
-                          context,
-                        ).textTheme.bodyMedium?.color?.withValues(alpha: 0.7),
-                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ),
               ),
-            ),
 
-            // ===== ETA =====
-            Padding(
-              padding: const EdgeInsets.only(right: 8.0),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  FittedBox(
-                    fit: BoxFit.scaleDown,
-                    child: Text(
+              const SizedBox(width: 12),
+              VerticalDivider(
+                color: theme.dividerColor.withValues(alpha: 0.1),
+                thickness: 1.5,
+                width: 1,
+              ),
+              const SizedBox(width: 16),
+
+              // Right: ETA
+              SizedBox(
+                width: 90,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
                       AppLocalizations.of(context, 'will_arrive_in'),
                       style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w500,
-                        color: Theme.of(context).textTheme.bodyMedium?.color,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: theme.textTheme.bodyMedium?.color?.withValues(
+                          alpha: 0.5,
+                        ),
                       ),
                     ),
-                  ),
-                  Text(
-                    etaText,
-                    style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w900,
-                      color: dynamicStatusColor,
+                    const SizedBox(height: 4),
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: ShaderMask(
+                        shaderCallback: (bounds) => LinearGradient(
+                          colors: [
+                            dynamicStatusColor,
+                            dynamicStatusColor.withValues(alpha: 0.8),
+                          ],
+                        ).createShader(bounds),
+                        child: Text(
+                          etaText,
+                          style: const TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w900,
+                            color: Colors.white,
+                            height: 1.1,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
                     ),
-                  ),
-                ],
+                    if (etaAbsolute.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        etaAbsolute,
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                          color: theme.textTheme.bodyMedium?.color?.withValues(
+                            alpha: 0.5,
+                          ),
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

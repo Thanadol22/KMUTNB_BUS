@@ -1,11 +1,10 @@
 import 'dart:developer';
-// import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:firebase_core/firebase_core.dart'; // เพิ่มกลับมา
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:timezone/data/latest_all.dart' as tz;
-import 'package:timezone/timezone.dart' as tz;
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 // ต้องอยู่ระดับ top-level (นอกคลาส) เพื่อให้ทำงานตอนแอปปิดได้
@@ -13,9 +12,7 @@ import 'package:permission_handler/permission_handler.dart';
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   // บังคับ Initialize Firebase เพื่อให้การรับข้อความจาก Background ทำงานได้สมบูรณ์
   await Firebase.initializeApp();
-
   log("Handling a background message: ${message.messageId}");
-  // TODO: เตรียมสำหรับการอัปเดตข้อมูลสถิติหรือฐานข้อมูลเวลาแอปทำงานเบื้องหลัง
 }
 
 class NotificationService {
@@ -27,12 +24,9 @@ class NotificationService {
       FlutterLocalNotificationsPlugin();
 
   Future<void> init() async {
-    // กำหนด Timezone พื้นฐานสำหรับระบบ Scheduling
-    tz.initializeTimeZones();
-    tz.setLocalLocation(tz.getLocation('Asia/Bangkok'));
-
     try {
       final FirebaseMessaging messaging = FirebaseMessaging.instance;
+
       // 1. ตั้งค่า Background Handler สำหรับตอนปิดแอป (Terminated) หรือพับจอ (Background)
       FirebaseMessaging.onBackgroundMessage(
         _firebaseMessagingBackgroundHandler,
@@ -46,22 +40,26 @@ class NotificationService {
       );
       log('User granted permission: ${settings.authorizationStatus}');
 
-      // 3. เตรียมคว้ารับ Token เพื่อไว้เก็บในฐานข้อมูล (ให้ Server รู้ว่าต้องส่งหาใคร)
+      // 3. ดึง FCM Token และบันทึกลง Firestore
       String? token = await messaging.getToken();
       log("FCM Token: $token");
+      if (token != null) {
+        await _saveFcmTokenToFirestore(token);
+      }
 
+      // 4. เมื่อ Token ถูก Refresh (เช่น หลัง reinstall, clear data) ให้อัปเดตอัตโนมัติ
       messaging.onTokenRefresh.listen((newToken) {
         log("FCM Token Refreshed: $newToken");
+        _saveFcmTokenToFirestore(newToken);
       });
 
-      // 4. รับข้อความตอนที่แอปเปิดใช้งานอยู่ (Foreground)
+      // 5. รับข้อความตอนที่แอปเปิดใช้งานอยู่ (Foreground) → แสดงเป็น Local Notification
       FirebaseMessaging.onMessage.listen((RemoteMessage message) {
         log('Got a message whilst in the foreground!');
         RemoteNotification? notification = message.notification;
         AndroidNotification? android = message.notification?.android;
 
         if (notification != null && android != null) {
-          // แสดงเป็น Pop-up ทันทีเมื่อแอปเปิดอยู่
           _localNotifications.show(
             id: notification.hashCode,
             title: notification.title,
@@ -72,7 +70,7 @@ class NotificationService {
                 'High Importance Notifications',
                 importance: Importance.max,
                 icon: '@drawable/ic_notification',
-                color: const Color(0xFFFFFFFF),
+                color: Color(0xFFFFFFFF),
               ),
             ),
             payload: message.data.toString(),
@@ -83,6 +81,7 @@ class NotificationService {
       log('Firebase Messaging ยังไม่ได้ถูกตั้งค่า (รอเชื่อม Database): $e');
     }
 
+    // ตั้งค่า Local Notifications Plugin (ใช้แสดง Foreground notification)
     const AndroidInitializationSettings androidInit =
         AndroidInitializationSettings('@drawable/ic_notification');
     const DarwinInitializationSettings iosInit = DarwinInitializationSettings();
@@ -99,17 +98,17 @@ class NotificationService {
       },
     );
 
-    // Explicitly request permissions for Local Notifications on Android 13+ and Exact Alarms on 12+
+    // ขอสิทธิ์ Notification สำหรับ Android 13+
     final AndroidFlutterLocalNotificationsPlugin? androidImplementation =
         _localNotifications.resolvePlatformSpecificImplementation<
             AndroidFlutterLocalNotificationsPlugin>();
-    
+
     if (androidImplementation != null) {
       await androidImplementation.requestNotificationsPermission();
-      await androidImplementation.requestExactAlarmsPermission();
-      
-      // ขอสิทธิ์ Unrestricted Battery บน Android เพื่อไม่ให้ OS ลบ Scheduled Notification ตอนปัดแอปทิ้ง
-      final isBatteryOptimizationIgnored = await Permission.ignoreBatteryOptimizations.isGranted;
+
+      // ขอสิทธิ์ Unrestricted Battery เพื่อไม่ให้ OS ลบ Notification ตอนปัดแอปทิ้ง
+      final isBatteryOptimizationIgnored =
+          await Permission.ignoreBatteryOptimizations.isGranted;
       if (!isBatteryOptimizationIgnored) {
         log('Requesting ignoreBatteryOptimizations permission...');
         await Permission.ignoreBatteryOptimizations.request();
@@ -117,7 +116,27 @@ class NotificationService {
     }
   }
 
-  // ฟังก์ชันจำลองการแจ้งเตือนแบบ Local (ไว้ใช้ทดสอบการทำงานของ Local Notification)
+  /// บันทึก FCM Token ลง Firestore ที่ users/{uid}/fcm_token
+  /// เพื่อให้ Server (PHP) สามารถดึง token ไปยิง Push Notification ได้
+  Future<void> _saveFcmTokenToFirestore(String token) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final uid = prefs.getString('uid');
+      if (uid == null || uid.isEmpty) {
+        log('Cannot save FCM token: No user logged in');
+        return;
+      }
+
+      await FirebaseFirestore.instance.collection('users').doc(uid).update({
+        'fcm_token': token,
+      });
+      log('FCM Token saved to Firestore for user: $uid');
+    } catch (e) {
+      log('Error saving FCM token to Firestore: $e');
+    }
+  }
+
+  /// แสดง Local Notification ทันที (ใช้ทดสอบ)
   Future<void> showLocalNotification(String title, String body) async {
     const AndroidNotificationDetails androidDetails =
         AndroidNotificationDetails(
@@ -126,7 +145,7 @@ class NotificationService {
           importance: Importance.max,
           priority: Priority.high,
           icon: '@drawable/ic_notification',
-          color: const Color(0xFFFFFFFF),
+          color: Color(0xFFFFFFFF),
         );
     const NotificationDetails platformDetails = NotificationDetails(
       android: androidDetails,
@@ -139,47 +158,4 @@ class NotificationService {
       notificationDetails: platformDetails,
     );
   }
-
-  // ยกเลิกการแจังเตือนทั้งหมดที่ถูกตั้งเวลาไว้
-  Future<void> cancelAllNotifications() async {
-    await _localNotifications.cancelAll();
-    log("All scheduled notifications have been cancelled.");
-  }
-
-  // ฟังก์ชันจองการแจ้งเตือนเวลาล่วงหน้า
-  Future<void> scheduleNotification({
-    required int id,
-    required String title,
-    required String body,
-    required DateTime scheduledDate,
-  }) async {
-    const AndroidNotificationDetails androidDetails =
-        AndroidNotificationDetails(
-          'scheduled_channel',
-          'Scheduled Notifications',
-          importance: Importance.max,
-          priority: Priority.high,
-          icon: '@drawable/ic_notification',
-          color: Color(0xFFFFFFFF),
-        );
-    const NotificationDetails platformDetails = NotificationDetails(
-      android: androidDetails,
-    );
-
-    final tz.TZDateTime tzScheduledDate = tz.TZDateTime.from(
-      scheduledDate,
-      tz.local,
-    );
-
-    await _localNotifications.zonedSchedule(
-      id: id,
-      title: title,
-      body: body,
-      scheduledDate: tzScheduledDate,
-      notificationDetails: platformDetails,
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-    );
-    log("Scheduled notification id: $id at $tzScheduledDate");
-  }
-
 }
