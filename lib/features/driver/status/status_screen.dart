@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_database/firebase_database.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'dart:async';
 import '../../../core/services/firebase_auth.dart';
 import '../../../core/utils/app_localizations.dart';
 
@@ -15,6 +19,10 @@ class _StatusScreenState extends State<StatusScreen> {
   bool _isSaving = false;
   String? _currentBusId;
   String? _busDocId;
+
+  StreamSubscription<DatabaseEvent>? _trackingSubscription;
+  double? _batteryLevel;
+  double? _batteryVoltage;
 
   final List<String> _statusCodes = [
     'status_ready',
@@ -47,11 +55,20 @@ class _StatusScreenState extends State<StatusScreen> {
 
         String statusCode;
         switch (status) {
-          case 'พร้อมให้บริการ': statusCode = 'status_ready'; break;
-          case 'หยุดให้บริการ': statusCode = 'status_stop'; break;
-          case 'ซ่อมบำรุง': statusCode = 'status_maintain'; break;
-          case 'เติมน้ำมัน': statusCode = 'status_fuel'; break;
-          default: statusCode = 'status_ready';
+          case 'พร้อมให้บริการ':
+            statusCode = 'status_ready';
+            break;
+          case 'หยุดให้บริการ':
+            statusCode = 'status_stop';
+            break;
+          case 'ซ่อมบำรุง':
+            statusCode = 'status_maintain';
+            break;
+          case 'เติมน้ำมัน':
+            statusCode = 'status_fuel';
+            break;
+          default:
+            statusCode = 'status_ready';
         }
 
         if (mounted) {
@@ -60,6 +77,9 @@ class _StatusScreenState extends State<StatusScreen> {
             _busDocId = busDoc.id;
             _currentBusId = busData['bus_id'] ?? busDoc.id;
           });
+          if (_currentBusId != null) {
+            _listenToTrackingData(_currentBusId!);
+          }
         }
       }
     } catch (e) {
@@ -79,11 +99,20 @@ class _StatusScreenState extends State<StatusScreen> {
       // Map status code → Thai text
       String statusThai;
       switch (_currentStatusCode) {
-        case 'status_ready': statusThai = 'พร้อมให้บริการ'; break;
-        case 'status_stop': statusThai = 'หยุดให้บริการ'; break;
-        case 'status_maintain': statusThai = 'ซ่อมบำรุง'; break;
-        case 'status_fuel': statusThai = 'เติมน้ำมัน'; break;
-        default: statusThai = 'ไม่ทราบสถานะ';
+        case 'status_ready':
+          statusThai = 'พร้อมให้บริการ';
+          break;
+        case 'status_stop':
+          statusThai = 'หยุดให้บริการ';
+          break;
+        case 'status_maintain':
+          statusThai = 'ซ่อมบำรุง';
+          break;
+        case 'status_fuel':
+          statusThai = 'เติมน้ำมัน';
+          break;
+        default:
+          statusThai = 'ไม่ทราบสถานะ';
       }
 
       String busId = _currentBusId ?? '';
@@ -113,7 +142,10 @@ class _StatusScreenState extends State<StatusScreen> {
           docId = newDoc.id;
           busId = newDoc.id;
 
-          final userDoc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
+          final userDoc = await FirebaseFirestore.instance
+              .collection('users')
+              .doc(uid)
+              .get();
           final licensePlate = userDoc.data()?['Tag'] ?? '';
 
           await newDoc.set({
@@ -130,11 +162,14 @@ class _StatusScreenState extends State<StatusScreen> {
           _currentBusId = busId;
           _busDocId = docId;
         });
+        _listenToTrackingData(busId);
 
         final statusText = AppLocalizations.of(context, _currentStatusCode);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('${AppLocalizations.of(context, 'status_updated')} $statusText'),
+            content: Text(
+              '${AppLocalizations.of(context, 'status_updated')} $statusText',
+            ),
             backgroundColor: Colors.green,
             duration: const Duration(seconds: 1), // Faster response
           ),
@@ -144,7 +179,9 @@ class _StatusScreenState extends State<StatusScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('${AppLocalizations.of(context, 'error_prefix')}: ${e.toString()}'),
+            content: Text(
+              '${AppLocalizations.of(context, 'error_prefix')}: ${e.toString()}',
+            ),
             backgroundColor: Colors.red,
           ),
         );
@@ -156,6 +193,101 @@ class _StatusScreenState extends State<StatusScreen> {
         });
       }
     }
+  }
+
+  @override
+  void dispose() {
+    _trackingSubscription?.cancel();
+    super.dispose();
+  }
+
+  void _listenToTrackingData(String busId) {
+    _trackingSubscription?.cancel();
+    try {
+      final databaseRef = FirebaseDatabase.instance.ref('tracking');
+
+      _trackingSubscription = databaseRef.onValue.listen((event) {
+        if (!mounted) return;
+        final raw = event.snapshot.value;
+        if (raw == null) return;
+
+        Map<String, dynamic> trackingData = _safeMap(raw);
+        String? targetRawBusId;
+        for (var key in trackingData.keys) {
+          if (_normalizeBusId(key.toString()) == _normalizeBusId(busId)) {
+            targetRawBusId = key.toString();
+            break;
+          }
+        }
+
+        if (targetRawBusId != null) {
+          final node = trackingData[targetRawBusId];
+          final nodeMap = _safeMap(node);
+          if (nodeMap.isNotEmpty) {
+            final busInfo = _extractLatestBoardData(nodeMap);
+            if (busInfo.isNotEmpty) {
+              if (mounted) {
+                setState(() {
+                  _batteryLevel = _toDouble(
+                    busInfo['battery_percent'] ??
+                        busInfo['battery'] ??
+                        busInfo['batt'] ??
+                        busInfo['bat'] ??
+                        busInfo['vbat'],
+                  );
+                  _batteryVoltage = _toDouble(busInfo['battery_voltage']);
+                });
+              }
+            }
+          }
+        }
+      });
+    } catch (e) {
+      // Ignore errors
+    }
+  }
+
+  String _normalizeBusId(String rawBusId) {
+    final cleaned = rawBusId.replaceAll(RegExp(r'[\s_\-]+'), '').toUpperCase();
+    return cleaned.replaceFirst(RegExp(r'^BUSO(?=\d)'), 'BUS0');
+  }
+
+  double? _toDouble(dynamic value) {
+    if (value is num) return value.toDouble();
+    return double.tryParse(value?.toString() ?? '');
+  }
+
+  Map<String, dynamic> _safeMap(dynamic raw) {
+    if (raw == null) return {};
+    if (raw is Map) {
+      final map = <String, dynamic>{};
+      raw.forEach((k, v) => map[k.toString()] = v);
+      return map;
+    }
+    if (raw is List) {
+      final map = <String, dynamic>{};
+      for (int i = 0; i < raw.length; i++) {
+        if (raw[i] != null) {
+          map[i.toString()] = raw[i];
+        }
+      }
+      return map;
+    }
+    return {};
+  }
+
+  Map<String, dynamic> _extractLatestBoardData(Map<String, dynamic> nodeMap) {
+    bool hasNestedMap = nodeMap.values.any((v) => v is Map);
+    if (hasNestedMap) {
+      final mapKeys = nodeMap.keys.where((k) => nodeMap[k] is Map).toList()
+        ..sort();
+      if (mapKeys.isNotEmpty) {
+        return Map<String, dynamic>.from(nodeMap[mapKeys.last] as Map);
+      }
+    } else {
+      return nodeMap;
+    }
+    return {};
   }
 
   @override
@@ -172,8 +304,42 @@ class _StatusScreenState extends State<StatusScreen> {
             if (_currentBusId != null)
               Card(
                 child: ListTile(
-                  leading: const Icon(Icons.directions_bus, color: Color(0xFFFF4009)),
-                  title: Text('${AppLocalizations.of(context, 'bus_label')}: $_currentBusId'),
+                  leading: const Icon(
+                    Icons.directions_bus,
+                    color: Color(0xFFFF4009),
+                  ),
+                  title: Text(
+                    '${AppLocalizations.of(context, 'bus_label')}: $_currentBusId',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        _batteryLevel != null
+                            ? '${_batteryLevel!.toStringAsFixed(0)}%'
+                            : '-',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: _batteryLevel != null
+                              ? (_batteryLevel! > 20 ? Colors.green : Colors.red)
+                              : Colors.grey,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Icon(
+                        _batteryLevel != null
+                            ? (_batteryLevel! > 20
+                                ? Icons.battery_full
+                                : Icons.battery_alert)
+                            : Icons.battery_unknown,
+                        color: _batteryLevel != null
+                            ? (_batteryLevel! > 20 ? Colors.green : Colors.red)
+                            : Colors.grey,
+                      ),
+                    ],
+                  ),
                 ),
               ),
             const SizedBox(height: 8),
@@ -186,11 +352,25 @@ class _StatusScreenState extends State<StatusScreen> {
               IconData statusIcon;
               Color statusColor;
               switch (code) {
-                case 'status_ready': statusIcon = Icons.check_circle; statusColor = Colors.green; break;
-                case 'status_stop': statusIcon = Icons.pause_circle; statusColor = Colors.grey; break;
-                case 'status_maintain': statusIcon = Icons.build; statusColor = Colors.red; break;
-                case 'status_fuel': statusIcon = Icons.local_gas_station; statusColor = Colors.blue; break;
-                default: statusIcon = Icons.help; statusColor = Colors.grey;
+                case 'status_ready':
+                  statusIcon = Icons.check_circle;
+                  statusColor = Colors.green;
+                  break;
+                case 'status_stop':
+                  statusIcon = Icons.pause_circle;
+                  statusColor = Colors.grey;
+                  break;
+                case 'status_maintain':
+                  statusIcon = Icons.build;
+                  statusColor = Colors.red;
+                  break;
+                case 'status_fuel':
+                  statusIcon = Icons.local_gas_station;
+                  statusColor = Colors.blue;
+                  break;
+                default:
+                  statusIcon = Icons.help;
+                  statusColor = Colors.grey;
               }
 
               return Card(
@@ -220,8 +400,13 @@ class _StatusScreenState extends State<StatusScreen> {
                 onPressed: _isSaving ? null : _saveStatus,
                 child: _isSaving
                     ? const CircularProgressIndicator(color: Colors.white)
-                    : Text(AppLocalizations.of(context, 'save_status'),
-                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    : Text(
+                        AppLocalizations.of(context, 'save_status'),
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
               ),
             ),
             const SizedBox(height: 16),
