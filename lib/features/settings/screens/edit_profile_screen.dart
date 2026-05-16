@@ -5,10 +5,9 @@ import 'package:image_picker/image_picker.dart';
 import '../../../core/services/firebase_auth.dart';
 import '../../auth/widgets/custom_text_field.dart';
 import '../../../core/utils/app_localizations.dart';
-import '../../../core/services/firebase_database.dart';
 
 class EditProfileScreen extends StatefulWidget {
-  const EditProfileScreen({Key? key}) : super(key: key);
+  const EditProfileScreen({super.key});
 
   @override
   State<EditProfileScreen> createState() => _EditProfileScreenState();
@@ -229,7 +228,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     ),
                     const SizedBox(height: 16),
                     DropdownButtonFormField<String>(
-                      value: _gender,
+                      initialValue: _gender,
                       decoration: InputDecoration(
                         labelText: AppLocalizations.of(context, 'gender'),
                         prefixIcon: const Icon(

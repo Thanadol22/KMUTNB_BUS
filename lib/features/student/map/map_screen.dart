@@ -15,7 +15,7 @@ import '../../../core/services/eta_service.dart';
 import 'package:provider/provider.dart';
 
 class MapScreen extends StatefulWidget {
-  const MapScreen({Key? key}) : super(key: key);
+  const MapScreen({super.key});
 
   @override
   State<MapScreen> createState() => _MapScreenState();
@@ -391,8 +391,9 @@ class _MapScreenState extends State<MapScreen> {
                       DateTime now = DateTime.now();
                       Map<String, dynamic>? activeRound;
                       for (var s in _schedulesCache) {
-                        if (s['bus_id'] != busId && s['bus_id'] != 'bus_01')
+                        if (s['bus_id'] != busId && s['bus_id'] != 'bus_01') {
                           continue;
+                        }
                         final startStr = s['start_time']?.toString() ?? '';
                         final endStr = s['end_time']?.toString() ?? '';
                         final partsStart = startStr.split(':');
@@ -602,7 +603,7 @@ class _MapScreenState extends State<MapScreen> {
                         options: MapOptions(
                           initialCenter: centerLocation,
                           initialZoom: 16.0,
-                          onTap: (_, __) {
+                          onTap: (_, _) {
                             if (_selectedLocationId != null) {
                               setState(() => _selectedLocationId = null);
                             }

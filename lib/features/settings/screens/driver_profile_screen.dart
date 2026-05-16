@@ -11,7 +11,7 @@ import 'driver_license_screen.dart';
 import '../../auth/screens/login_screen.dart';
 
 class DriverProfileScreen extends StatefulWidget {
-  const DriverProfileScreen({Key? key}) : super(key: key);
+  const DriverProfileScreen({super.key});
 
   @override
   State<DriverProfileScreen> createState() => _DriverProfileScreenState();

@@ -9,7 +9,7 @@ import 'edit_profile_screen.dart';
 import 'change_password_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
-  const SettingsScreen({Key? key}) : super(key: key);
+  const SettingsScreen({super.key});
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
@@ -86,7 +86,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             secondary: const Icon(Icons.dark_mode),
             title: Text(AppLocalizations.of(context, 'dark_mode')),
             value: themeProvider.isDarkMode,
-            activeColor: Color(0xFFFF4009),
+            activeThumbColor: Color(0xFFFF4009),
             onChanged: (value) {
               themeProvider.toggleTheme();
             },

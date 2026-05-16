@@ -5,7 +5,7 @@ import 'core/utils/localization_provider.dart';
 import 'features/auth/screens/auth_check_screen.dart';
 
 class BusTrackerApp extends StatelessWidget {
-  const BusTrackerApp({Key? key}) : super(key: key);
+  const BusTrackerApp({super.key});
 
   @override
   Widget build(BuildContext context) {

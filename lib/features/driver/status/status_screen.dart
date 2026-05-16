@@ -7,7 +7,7 @@ import '../../../core/utils/app_localizations.dart';
 import 'dart:async';
 
 class StatusScreen extends StatefulWidget {
-  const StatusScreen({Key? key}) : super(key: key);
+  const StatusScreen({super.key});
 
   @override
   State<StatusScreen> createState() => _StatusScreenState();
@@ -314,7 +314,7 @@ class _StatusScreenState extends State<StatusScreen>
         ),
         content: isDropdown
             ? DropdownButtonFormField<String>(
-                value: busTypes.contains(selectedType) ? selectedType : null,
+                initialValue: busTypes.contains(selectedType) ? selectedType : null,
                 items: busTypes
                     .map((t) => DropdownMenuItem(value: t, child: Text(AppLocalizations.of(context, t))))
                     .toList(),
@@ -461,7 +461,7 @@ class _StatusScreenState extends State<StatusScreen>
                                       children: [
                                         Text(
                                           _batteryLevel != null
-                                              ? '${_batteryLevel!.toStringAsFixed(0)}'
+                                              ? _batteryLevel!.toStringAsFixed(0)
                                               : '--',
                                           style: TextStyle(
                                             fontSize: 64,

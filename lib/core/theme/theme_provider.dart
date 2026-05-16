@@ -45,7 +45,6 @@ class ThemeProvider with ChangeNotifier {
           selectedItemColor: Color(0xFFFF4009),
           unselectedItemColor: Colors.grey,
         ),
-        useMaterial3: true,
       );
     }
   }

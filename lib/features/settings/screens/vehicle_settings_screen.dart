@@ -6,7 +6,7 @@ import '../../auth/widgets/custom_text_field.dart';
 import '../../../core/utils/app_localizations.dart';
 
 class VehicleSettingsScreen extends StatefulWidget {
-  const VehicleSettingsScreen({Key? key}) : super(key: key);
+  const VehicleSettingsScreen({super.key});
 
   @override
   State<VehicleSettingsScreen> createState() => _VehicleSettingsScreenState();
@@ -148,7 +148,7 @@ class _VehicleSettingsScreenState extends State<VehicleSettingsScreen> {
                 child: Column(
                   children: [
                     DropdownButtonFormField<String>(
-                      value: _busType,
+                      initialValue: _busType,
                       decoration: InputDecoration(
                         labelText: AppLocalizations.of(context, 'bus_type'),
                         prefixIcon: const Icon(Icons.directions_bus, color: Color(0xFFFF4009)),

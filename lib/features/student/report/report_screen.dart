@@ -4,7 +4,7 @@ import '../../../core/services/firebase_auth.dart';
 import '../../../core/utils/app_localizations.dart';
 
 class ReportScreen extends StatefulWidget {
-  const ReportScreen({Key? key}) : super(key: key);
+  const ReportScreen({super.key});
 
   @override
   State<ReportScreen> createState() => _ReportScreenState();
@@ -33,8 +33,9 @@ class _ReportScreenState extends State<ReportScreen> {
 
       // Convert enum/value to topic based on database.md spec
       String topicName = '';
-      if (_selectedIssue == 'late') topicName = 'รถไม่มาตรงเวลา';
-      else if (_selectedIssue == 'driver') topicName = 'พฤติกรรมพนักงานขับรถ';
+      if (_selectedIssue == 'late') {
+        topicName = 'รถไม่มาตรงเวลา';
+      } else if (_selectedIssue == 'driver') topicName = 'พฤติกรรมพนักงานขับรถ';
       else if (_selectedIssue == 'app') topicName = 'แอปพลิเคชันมีปัญหา';
       else topicName = 'อื่นๆ';
 
@@ -98,7 +99,7 @@ class _ReportScreenState extends State<ReportScreen> {
               ),
               const SizedBox(height: 8),
               DropdownButtonFormField<String>(
-                value: _selectedIssue,
+                initialValue: _selectedIssue,
                 items: [
                   DropdownMenuItem(value: 'late', child: Text(AppLocalizations.of(context, 'issue_late'))),
                   DropdownMenuItem(value: 'driver', child: Text(AppLocalizations.of(context, 'issue_driver'))),

@@ -6,7 +6,7 @@ import 'report/report_screen.dart';
 import '../settings/screens/settings_screen.dart';
 
 class StudentMainScreen extends StatefulWidget {
-  const StudentMainScreen({Key? key}) : super(key: key);
+  const StudentMainScreen({super.key});
 
   @override
   State<StudentMainScreen> createState() => _StudentMainScreenState();

@@ -469,10 +469,12 @@ class AppLocalizations {
     if (status == 'เติมน้ำมัน') return of(context, 'status_fuel');
     if (status == 'กำลังวิ่ง' ||
         status == 'วิ่งอยู่' ||
-        status == 'กำลังเดินทาง')
+        status == 'กำลังเดินทาง') {
       return of(context, 'status_running');
-    if (status == 'จอดอยู่' || status == 'จอดรอ')
+    }
+    if (status == 'จอดอยู่' || status == 'จอดรอ') {
       return of(context, 'status_parking');
+    }
     if (status == 'รับส่งตรงป้าย') return of(context, 'status_at_stop');
     if (status == 'ไม่ทราบสถานะ') return of(context, 'status_unknown');
     return status;

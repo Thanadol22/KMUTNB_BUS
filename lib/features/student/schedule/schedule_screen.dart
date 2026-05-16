@@ -6,7 +6,7 @@ import '../../../core/services/firebase_database.dart';
 import '../../../models/detailed_schedule_model.dart';
 
 class ScheduleScreen extends StatelessWidget {
-  const ScheduleScreen({Key? key}) : super(key: key);
+  const ScheduleScreen({super.key});
 
   int _findCurrentRoundIndex(List<DetailedScheduleModel> schedules, DateTime now) {
     if (schedules.isEmpty) return -1;

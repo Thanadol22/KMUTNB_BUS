@@ -8,7 +8,7 @@ import '../../../core/utils/app_localizations.dart';
 import 'package:intl/intl.dart';
 
 class DriverLicenseScreen extends StatefulWidget {
-  const DriverLicenseScreen({Key? key}) : super(key: key);
+  const DriverLicenseScreen({super.key});
 
   @override
   State<DriverLicenseScreen> createState() => _DriverLicenseScreenState();
@@ -60,11 +60,11 @@ class _DriverLicenseScreenState extends State<DriverLicenseScreen> {
         if (data != null && mounted) {
           setState(() {
             _licenseNumberController.text = data!['license_number'] ?? '';
-            _licenseType = data!['license_type'];
-            if (data!['license_expiry_date'] != null) {
-              _expiryDate = (data!['license_expiry_date'] as Timestamp).toDate();
+            _licenseType = data['license_type'];
+            if (data['license_expiry_date'] != null) {
+              _expiryDate = (data['license_expiry_date'] as Timestamp).toDate();
             }
-            _licenseImageUrl = data!['license_image_url'];
+            _licenseImageUrl = data['license_image_url'];
             _isLoading = false;
           });
         } else if (mounted) {
@@ -301,7 +301,7 @@ class _DriverLicenseScreenState extends State<DriverLicenseScreen> {
 
                           // License Type
                           DropdownButtonFormField<String>(
-                            value: _licenseTypes.contains(_licenseType) ? _licenseType : null,
+                            initialValue: _licenseTypes.contains(_licenseType) ? _licenseType : null,
                             items: _licenseTypes.map((type) => DropdownMenuItem(value: type, child: Text(AppLocalizations.of(context, type)))).toList(),
                             onChanged: (val) => setState(() => _licenseType = val),
                             decoration: InputDecoration(

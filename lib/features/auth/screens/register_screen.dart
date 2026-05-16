@@ -4,7 +4,7 @@ import '../../../core/services/firebase_auth.dart';
 import '../../../core/utils/app_localizations.dart';
 
 class RegisterScreen extends StatefulWidget {
-  const RegisterScreen({Key? key}) : super(key: key);
+  const RegisterScreen({super.key});
 
   @override
   State<RegisterScreen> createState() => _RegisterScreenState();

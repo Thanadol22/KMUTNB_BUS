@@ -6,7 +6,7 @@ import 'notifications/notification_screen.dart';
 import '../settings/screens/driver_profile_screen.dart';
 
 class DriverMainScreen extends StatefulWidget {
-  const DriverMainScreen({Key? key}) : super(key: key);
+  const DriverMainScreen({super.key});
 
   @override
   State<DriverMainScreen> createState() => _DriverMainScreenState();

@@ -5,7 +5,7 @@ import '../../student/student_main_screen.dart';
 import '../../driver/driver_main_screen.dart';
 
 class AuthCheckScreen extends StatefulWidget {
-  const AuthCheckScreen({Key? key}) : super(key: key);
+  const AuthCheckScreen({super.key});
 
   @override
   State<AuthCheckScreen> createState() => _AuthCheckScreenState();

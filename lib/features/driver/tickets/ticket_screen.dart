@@ -7,7 +7,7 @@ import '../../../models/schedule_model.dart';
 import '../../../models/ticket_report.dart';
 
 class TicketScreen extends StatefulWidget {
-  const TicketScreen({Key? key}) : super(key: key);
+  const TicketScreen({super.key});
 
   @override
   State<TicketScreen> createState() => _TicketScreenState();
@@ -308,7 +308,7 @@ class TicketScreen extends StatefulWidget {
 
             // Dropdown แสดงรอบใกล้เคียง
             DropdownButtonFormField<ScheduleModel>(
-              value: _selectedRound,
+              initialValue: _selectedRound,
               isExpanded: true,
               items: _allRounds.map((round) {
                 final startTime = round.startTime;
@@ -582,7 +582,7 @@ class TicketScreen extends StatefulWidget {
                               ),
                             ),
                           );
-                        }).toList(),
+                        }),
                         if (allDocs.length > 3)
                           Padding(
                             padding: const EdgeInsets.only(top: 8.0),
