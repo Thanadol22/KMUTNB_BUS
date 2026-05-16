@@ -41,16 +41,42 @@ class _LoginScreenState extends State<LoginScreen> {
 
       String role = userData['role'] ?? 'student';
 
+      // ตรวจสอบสิทธิ์การเข้าใช้งาน
+      bool isAllowed = false;
       if (role == 'driver') {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const DriverMainScreen()),
-        );
+        isAllowed = true; // คนขับรถเข้าได้ทุกลิขสิทธิ์อีเมล
+      } else if (role == 'student') {
+        // นักศึกษาต้องใช้เมล @email.kmutnb.ac.th เท่านั้น
+        if (username.endsWith('@email.kmutnb.ac.th')) {
+          isAllowed = true;
+        } else {
+          isAllowed = false;
+        }
+      }
+
+      if (isAllowed) {
+        if (role == 'driver') {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const DriverMainScreen()),
+          );
+        } else {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const StudentMainScreen()),
+          );
+        }
       } else {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const StudentMainScreen()),
-        );
+        // หากไม่ได้รับอนุญาต (เช่น นักศึกษาที่ใช้เมลอื่น) ให้ Logout
+        await _authService.logout();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(AppLocalizations.of(context, 'invalid_email_domain')),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -58,9 +84,9 @@ class _LoginScreenState extends State<LoginScreen> {
         if (e.toString().contains('invalid_login')) {
           errorMessage = AppLocalizations.of(context, 'invalid_login');
         } else if (e.toString().contains('user_inactive')) {
-          errorMessage = 'บัญชีนี้ปิดการใช้งาน หรือถูกระงับ (Inactive)';
+          errorMessage = AppLocalizations.of(context, 'user_inactive');
         } else if (e.toString().contains('network_error')) {
-          errorMessage = 'การเชื่อมต่ออินเทอร์เน็ตมีปัญหา';
+          errorMessage = AppLocalizations.of(context, 'network_error');
         } else {
           errorMessage = 'Error: ${e.toString()}';
         }
@@ -95,10 +121,10 @@ class _LoginScreenState extends State<LoginScreen> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     CustomTextField(
-                      label: AppLocalizations.of(context, 'username'),
-                      icon: Icons.person,
+                      label: AppLocalizations.of(context, 'email_login_label'),
+                      icon: Icons.email,
                       controller: _usernameController,
-                      keyboardType: TextInputType.text,
+                      keyboardType: TextInputType.emailAddress,
                     ),
                     CustomTextField(
                       label: AppLocalizations.of(context, 'password'),

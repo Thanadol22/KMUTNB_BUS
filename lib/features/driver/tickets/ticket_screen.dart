@@ -267,12 +267,16 @@ class TicketScreen extends StatefulWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final now = DateTime.now();
     final nowMinutes = now.hour * 60 + now.minute;
+    final textColor = Theme.of(context).textTheme.bodyLarge?.color;
 
     return Scaffold(
       appBar: AppBar(
         title: Text(AppLocalizations.of(context, 'ticket_report')),
+        backgroundColor: const Color(0xFFFF4009),
+        foregroundColor: Colors.white,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
@@ -377,9 +381,9 @@ class TicketScreen extends StatefulWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
-                border: Border.all(color: Colors.grey.shade400),
+                border: Border.all(color: isDark ? Colors.grey[700]! : Colors.grey.shade400),
                 borderRadius: BorderRadius.circular(12),
-                color: Colors.grey.shade50,
+                color: isDark ? Colors.grey[900] : Colors.grey.shade50,
               ),
               child: Row(
                 children: [
@@ -401,7 +405,7 @@ class TicketScreen extends StatefulWidget {
                         fontWeight: FontWeight.bold,
                         color: _ticketCountController.text.isEmpty
                             ? Colors.grey
-                            : Colors.black87,
+                            : textColor,
                       ),
                     ),
                   ),
@@ -420,7 +424,7 @@ class TicketScreen extends StatefulWidget {
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: Colors.grey.shade100,
+                color: isDark ? Colors.grey[900] : Colors.grey.shade100,
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Column(

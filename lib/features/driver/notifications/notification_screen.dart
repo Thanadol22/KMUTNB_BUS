@@ -177,6 +177,8 @@ class _NotificationScreenState extends State<NotificationScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(AppLocalizations.of(context, 'alert_queue')),
+        backgroundColor: const Color(0xFFFF4009),
+        foregroundColor: Colors.white,
         actions: [
           IconButton(
             icon: const Icon(Icons.notification_add),

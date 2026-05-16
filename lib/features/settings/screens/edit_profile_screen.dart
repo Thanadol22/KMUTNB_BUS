@@ -1,5 +1,7 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../../core/services/firebase_auth.dart';
 import '../../auth/widgets/custom_text_field.dart';
 import '../../../core/utils/app_localizations.dart';
@@ -17,11 +19,42 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   final _nameController = TextEditingController();
   final _usernameController = TextEditingController();
   final _phoneController = TextEditingController();
-  final _licensePlateController = TextEditingController();
+  final _dobController = TextEditingController();
   String? _role;
-  String? _busId;
+  String? _profileImageUrl;
+  File? _imageFile;
+  String? _gender;
+  String? _dateOfBirth;
   bool _isLoading = true;
   bool _isSaving = false;
+
+  final List<String> _genderOptions = ['male', 'female', 'other_gender'];
+
+  Future<void> _pickImage() async {
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
+    if (pickedFile != null) {
+      setState(() {
+        _imageFile = File(pickedFile.path);
+      });
+    }
+  }
+
+  Future<void> _selectDate(BuildContext context) async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now().subtract(const Duration(days: 365 * 20)),
+      firstDate: DateTime(1900),
+      lastDate: DateTime.now(),
+    );
+    if (picked != null) {
+      setState(() {
+        _dateOfBirth =
+            "${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}";
+        _dobController.text = _dateOfBirth!;
+      });
+    }
+  }
 
   @override
   void initState() {
@@ -43,16 +76,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           _usernameController.text = data['username'] ?? '';
           _phoneController.text = data['phone'] ?? '';
           _role = data['role'];
-
-          // ถ้าเป็นคนขับ ให้โหลดข้อมูลรถด้วย
-          if (_role != 'student') {
-            final busSnapshot = await DatabaseService().getBusForDriver(uid);
-            if (busSnapshot != null && busSnapshot.docs.isNotEmpty) {
-              final busDoc = busSnapshot.docs.first;
-              _busId = busDoc.id;
-              _licensePlateController.text = busDoc['license_plate'] ?? '';
-            }
-          }
+          _profileImageUrl = data['profile_image_url'];
+          _gender = data['gender'];
+          _dateOfBirth = data['date_of_birth'];
+          _dobController.text = _dateOfBirth ?? '';
         }
       }
     } catch (e) {
@@ -81,19 +108,19 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
     try {
       final authService = AuthService();
+      String? newImageUrl = _profileImageUrl;
+      if (_imageFile != null) {
+        newImageUrl = await authService.uploadProfilePicture(_imageFile!);
+      }
+
       await authService.updateProfile(
         name: _nameController.text.trim(),
         phone: _phoneController.text.trim(),
         username: _usernameController.text.trim(),
+        profileImageUrl: newImageUrl,
+        gender: _gender,
+        dateOfBirth: _dateOfBirth,
       );
-
-      // บันทึกทะเบียนรถ (ถ้ามี)
-      if (_busId != null && _role != 'student') {
-        await DatabaseService().updateBusLicensePlate(
-          _busId!,
-          _licensePlateController.text.trim(),
-        );
-      }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -125,6 +152,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
       appBar: AppBar(
         title: Text(AppLocalizations.of(context, 'edit_profile')),
@@ -139,6 +168,39 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 key: _formKey,
                 child: Column(
                   children: [
+                    // Profile Picture
+                    GestureDetector(
+                      onTap: _pickImage,
+                      child: Stack(
+                        alignment: Alignment.bottomRight,
+                        children: [
+                          CircleAvatar(
+                            radius: 50,
+                            backgroundColor: Colors.grey[200],
+                            backgroundImage: _imageFile != null
+                                ? FileImage(_imageFile!) as ImageProvider
+                                : (_profileImageUrl != null
+                                      ? NetworkImage(_profileImageUrl!)
+                                      : const AssetImage(
+                                          'assets/logo/logo.png',
+                                        )),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: const BoxDecoration(
+                              color: Color(0xFFFF4009),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.camera_alt,
+                              color: Colors.white,
+                              size: 20,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 24),
                     CustomTextField(
                       controller: _usernameController,
                       label: AppLocalizations.of(
@@ -165,32 +227,80 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         return null;
                       },
                     ),
-                    if (_role != 'student') ...[
-                      const SizedBox(height: 16),
-                      CustomTextField(
-                        controller: _phoneController,
-                        label: AppLocalizations.of(context, 'phone'),
-                        icon: Icons.phone,
-                        keyboardType: TextInputType.phone,
-                      ),
-                      const SizedBox(height: 16),
-                      CustomTextField(
-                        controller: _licensePlateController,
-                        label: AppLocalizations.of(
-                          context,
-                          'license_plate_label',
+                    const SizedBox(height: 16),
+                    DropdownButtonFormField<String>(
+                      value: _gender,
+                      decoration: InputDecoration(
+                        labelText: AppLocalizations.of(context, 'gender'),
+                        prefixIcon: const Icon(
+                          Icons.people,
+                          color: Color(0xFFFF4009),
                         ),
-                        icon: Icons.directions_bus,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(
+                            color: Color(0xFFFF4009),
+                            width: 2,
+                          ),
+                        ),
                       ),
-                    ],
+                      items: _genderOptions.map((String type) {
+                        return DropdownMenuItem<String>(
+                          value: type,
+                          child: Text(AppLocalizations.of(context, type)),
+                        );
+                      }).toList(),
+                      onChanged: (String? newValue) {
+                        setState(() {
+                          _gender = newValue;
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    GestureDetector(
+                      onTap: () => _selectDate(context),
+                      child: AbsorbPointer(
+                        child: CustomTextField(
+                          controller: _dobController,
+                          label: AppLocalizations.of(context, 'date_of_birth'),
+                          icon: Icons.calendar_today,
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return AppLocalizations.of(
+                                context,
+                                'required_field',
+                              );
+                            }
+                            return null;
+                          },
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    CustomTextField(
+                      controller: _phoneController,
+                      label: AppLocalizations.of(context, 'driver_phone_label'),
+                      icon: Icons.phone,
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return AppLocalizations.of(context, 'required_field');
+                        }
+                        return null;
+                      },
+                    ),
                     const SizedBox(height: 32),
                     SizedBox(
                       width: double.infinity,
                       height: 50,
                       child: ElevatedButton(
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Color(0xFFFF4009),
-                          foregroundColor: Colors.white,
+                          backgroundColor: const Color(0xFFFF4009),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                         ),
                         onPressed: _isSaving ? null : _saveProfile,
                         child: _isSaving
@@ -198,10 +308,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                                 color: Colors.white,
                               )
                             : Text(
-                                AppLocalizations.of(context, 'save_profile'),
+                                AppLocalizations.of(context, 'save_button'),
                                 style: const TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.bold,
+                                  color: Colors.white,
                                 ),
                               ),
                       ),

@@ -46,15 +46,52 @@ class _RegisterScreenState extends State<RegisterScreen> {
       return;
     }
 
+    // ตรวจสอบความปลอดภัยของรหัสผ่าน
+    if (password.length < 8) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(AppLocalizations.of(context, 'password_too_short')),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    bool hasUppercase = password.contains(RegExp(r'[A-Z]'));
+    bool hasLowercase = password.contains(RegExp(r'[a-z]'));
+    bool hasDigits = password.contains(RegExp(r'[0-9]'));
+
+    if (!hasUppercase || !hasLowercase || !hasDigits) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(AppLocalizations.of(context, 'password_complexity')),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    // ตรวจสอบรูปแบบอีเมลนักศึกษา @email.kmutnb.ac.th
+    if (!username.endsWith('@email.kmutnb.ac.th')) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(AppLocalizations.of(context, 'invalid_email_domain')),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
     setState(() {
       _isLoading = true;
     });
 
     try {
-      await _authService.registerStudent(
+      await _authService.registerUser(
         username: username,
         name: name,
         password: password,
+        role: 'student', // สมัครได้เฉพาะนักศึกษา
       );
 
       if (mounted) {
@@ -98,7 +135,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(AppLocalizations.of(context, 'register_title')),
-        backgroundColor: Color(0xFFFF4009),
+        backgroundColor: const Color(0xFFFF4009),
         foregroundColor: Colors.white,
       ),
       body: SingleChildScrollView(
@@ -107,9 +144,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             CustomTextField(
-              label: AppLocalizations.of(context, 'student_id'),
-              icon: Icons.badge,
+              label: AppLocalizations.of(context, 'email_login_label'),
+              icon: Icons.email,
               controller: _usernameController,
+              keyboardType: TextInputType.emailAddress,
             ),
             CustomTextField(
               label: AppLocalizations.of(context, 'full_name'),
@@ -128,7 +166,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
               isPassword: true,
               controller: _confirmPasswordController,
             ),
-
             const SizedBox(height: 32),
             _isLoading
                 ? const Center(child: CircularProgressIndicator())
@@ -136,7 +173,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     onPressed: _handleRegister,
                     style: ElevatedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 16),
-                      backgroundColor: Color(0xFFFF4009),
+                      backgroundColor: const Color(0xFFFF4009),
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),

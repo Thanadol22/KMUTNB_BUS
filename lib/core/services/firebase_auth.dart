@@ -1,5 +1,8 @@
+import 'dart:io';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 
 class AuthService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -56,11 +59,12 @@ class AuthService {
     }
   }
 
-  /// ลงทะเบียนนักศึกษาใหม่ใน Firestore
-  Future<void> registerStudent({
+  /// ลงทะเบียนผู้ใช้งานใหม่ใน Firestore
+  Future<void> registerUser({
     required String username,
     required String name,
     required String password,
+    required String role,
   }) async {
     try {
       // ตรวจสอบ username ซ้ำ
@@ -78,7 +82,7 @@ class AuthService {
         'username': username,
         'name': name,
         'password': password,
-        'role': 'student',
+        'role': role,
         'phone': '',
         'status': 'active',
         'fcm_token': '',
@@ -116,6 +120,13 @@ class AuthService {
     required String name,
     String? phone,
     String? username,
+    String? profileImageUrl,
+    String? busType,
+    String? busBrand,
+    int? busSeats,
+    String? driverLicense,
+    String? gender,
+    String? dateOfBirth,
   }) async {
     try {
       String? uid = await getCurrentUserId();
@@ -141,12 +152,48 @@ class AuthService {
 
       if (phone != null) updates['phone'] = phone;
       if (username != null) updates['username'] = username;
+      if (profileImageUrl != null) updates['profile_image_url'] = profileImageUrl;
+      if (busType != null) updates['bus_type'] = busType;
+      if (busBrand != null) updates['bus_brand'] = busBrand;
+      if (busSeats != null) updates['bus_seats'] = busSeats;
+      if (driverLicense != null) updates['driver_license'] = driverLicense;
+      if (gender != null) updates['gender'] = gender;
+      if (dateOfBirth != null) updates['date_of_birth'] = dateOfBirth;
 
       await _firestore.collection('users').doc(uid).update(updates);
 
       // อัปเดต name ใน SharedPreferences ด้วย
       SharedPreferences prefs = await SharedPreferences.getInstance();
       await prefs.setString('name', name);
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  /// อัปโหลดรูปโปรไฟล์
+  Future<String> uploadProfilePicture(File imageFile) async {
+    try {
+      String? uid = await getCurrentUserId();
+      if (uid == null) throw Exception('no_user_logged_in');
+
+      // Create a reference to Firebase Storage
+      final storageRef = FirebaseStorage.instance
+          .ref()
+          .child('profile_pictures')
+          .child('$uid.jpg');
+
+      // Upload the file
+      await storageRef.putFile(imageFile);
+
+      // Get the download URL
+      final String downloadUrl = await storageRef.getDownloadURL();
+
+      // Update the user document with the new image URL
+      await _firestore.collection('users').doc(uid).update({
+        'profile_image_url': downloadUrl,
+      });
+
+      return downloadUrl;
     } catch (e) {
       rethrow;
     }

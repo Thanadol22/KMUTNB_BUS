@@ -3,7 +3,7 @@ import '../../../core/utils/app_localizations.dart';
 import 'status/status_screen.dart';
 import 'tickets/ticket_screen.dart';
 import 'notifications/notification_screen.dart';
-import '../settings/screens/settings_screen.dart';
+import '../settings/screens/driver_profile_screen.dart';
 
 class DriverMainScreen extends StatefulWidget {
   const DriverMainScreen({Key? key}) : super(key: key);
@@ -15,23 +15,24 @@ class DriverMainScreen extends StatefulWidget {
 class _DriverMainScreenState extends State<DriverMainScreen> {
   int _currentIndex = 0;
 
-
   final List<Widget> _pages = [
     const StatusScreen(),
     const TicketScreen(),
     const NotificationScreen(),
-    const SettingsScreen(),
+    const DriverProfileScreen(),
   ];
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
       body: _pages[_currentIndex],
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
-        selectedItemColor: Color(0xFFFF4009),
-        unselectedItemColor: Colors.grey,
         type: BottomNavigationBarType.fixed,
+        selectedFontSize: 14,
+        unselectedFontSize: 12,
         onTap: (index) {
           setState(() {
             _currentIndex = index;
