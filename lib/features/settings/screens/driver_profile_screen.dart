@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
 import '../../../core/services/firebase_auth.dart';
@@ -90,7 +91,9 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
                           radius: 50,
                           backgroundColor: Colors.white,
                           backgroundImage: _profileImageUrl != null
-                              ? NetworkImage(_profileImageUrl!)
+                              ? (_profileImageUrl!.startsWith('data:image') || !_profileImageUrl!.startsWith('http')
+                                  ? MemoryImage(base64Decode(_profileImageUrl!.contains(',') ? _profileImageUrl!.split(',').last : _profileImageUrl!)) as ImageProvider
+                                  : NetworkImage(_profileImageUrl!))
                               : const AssetImage('assets/logo/logo.png') as ImageProvider,
                         ),
                       ),

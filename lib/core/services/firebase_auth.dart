@@ -1,7 +1,10 @@
 import 'dart:io';
+import 'dart:typed_data';
+import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:firebase_auth/firebase_auth.dart' as fb_auth;
 
 class AuthService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -169,30 +172,47 @@ class AuthService {
     }
   }
 
+  Future<void> _ensureFirebaseAuthenticated() async {
+    try {
+      final auth = fb_auth.FirebaseAuth.instance;
+      if (auth.currentUser == null) {
+        await auth.signInAnonymously();
+      }
+    } catch (e) {
+      print("Warning: Anonymous auth failed: $e");
+    }
+  }
+
   /// อัปโหลดรูปโปรไฟล์
-  Future<String> uploadProfilePicture(File imageFile) async {
+  Future<String> uploadProfilePicture(Uint8List imageBytes) async {
     try {
       String? uid = await getCurrentUserId();
       if (uid == null) throw Exception('no_user_logged_in');
 
-      // Create a reference to Firebase Storage
-      final storageRef = FirebaseStorage.instance
-          .ref()
-          .child('profile_pictures')
-          .child('$uid.jpg');
-
-      // Upload the file
-      await storageRef.putFile(imageFile);
-
-      // Get the download URL
-      final String downloadUrl = await storageRef.getDownloadURL();
+      // Convert to Base64 data URL directly
+      final String base64Image = 'data:image/jpeg;base64,${base64Encode(imageBytes)}';
 
       // Update the user document with the new image URL
       await _firestore.collection('users').doc(uid).update({
-        'profile_image_url': downloadUrl,
+        'profile_image_url': base64Image,
       });
 
-      return downloadUrl;
+      return base64Image;
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  /// อัปโหลดรูปใบขับขี่
+  Future<String> uploadLicenseImage(Uint8List imageBytes) async {
+    try {
+      String? uid = await getCurrentUserId();
+      if (uid == null) throw Exception('no_user_logged_in');
+
+      // Convert to Base64 data URL directly
+      final String base64Image = 'data:image/jpeg;base64,${base64Encode(imageBytes)}';
+
+      return base64Image;
     } catch (e) {
       rethrow;
     }

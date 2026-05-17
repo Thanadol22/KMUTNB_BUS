@@ -1,4 +1,5 @@
-import 'dart:io';
+import 'dart:typed_data';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
@@ -21,7 +22,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   final _dobController = TextEditingController();
   String? _role;
   String? _profileImageUrl;
-  File? _imageFile;
+  Uint8List? _imageBytes;
   String? _gender;
   String? _dateOfBirth;
   bool _isLoading = true;
@@ -31,10 +32,16 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   Future<void> _pickImage() async {
     final picker = ImagePicker();
-    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
+    final pickedFile = await picker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 400,
+      maxHeight: 400,
+      imageQuality: 70,
+    );
     if (pickedFile != null) {
+      final bytes = await pickedFile.readAsBytes();
       setState(() {
-        _imageFile = File(pickedFile.path);
+        _imageBytes = bytes;
       });
     }
   }
@@ -108,8 +115,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     try {
       final authService = AuthService();
       String? newImageUrl = _profileImageUrl;
-      if (_imageFile != null) {
-        newImageUrl = await authService.uploadProfilePicture(_imageFile!);
+      if (_imageBytes != null) {
+        newImageUrl = await authService.uploadProfilePicture(_imageBytes!);
       }
 
       await authService.updateProfile(
@@ -135,6 +142,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         String errMsg = AppLocalizations.of(context, 'profile_save_error');
         if (e.toString().contains('username_in_use')) {
           errMsg = AppLocalizations.of(context, 'username_taken');
+        } else {
+          errMsg = '$errMsg: $e';
         }
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(errMsg), backgroundColor: Colors.red),
@@ -151,8 +160,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
     return Scaffold(
       appBar: AppBar(
         title: Text(AppLocalizations.of(context, 'edit_profile')),
@@ -176,10 +183,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           CircleAvatar(
                             radius: 50,
                             backgroundColor: Colors.grey[200],
-                            backgroundImage: _imageFile != null
-                                ? FileImage(_imageFile!) as ImageProvider
+                            backgroundImage: _imageBytes != null
+                                ? MemoryImage(_imageBytes!) as ImageProvider
                                 : (_profileImageUrl != null
-                                      ? NetworkImage(_profileImageUrl!)
+                                      ? (_profileImageUrl!.startsWith('data:image') || !_profileImageUrl!.startsWith('http')
+                                          ? MemoryImage(base64Decode(_profileImageUrl!.contains(',') ? _profileImageUrl!.split(',').last : _profileImageUrl!)) as ImageProvider
+                                          : NetworkImage(_profileImageUrl!))
                                       : const AssetImage(
                                           'assets/logo/logo.png',
                                         )),
@@ -214,7 +223,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         return null;
                       },
                     ),
-                    const SizedBox(height: 16),
                     CustomTextField(
                       controller: _nameController,
                       label: AppLocalizations.of(context, 'full_name'),
@@ -226,39 +234,40 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         return null;
                       },
                     ),
-                    const SizedBox(height: 16),
-                    DropdownButtonFormField<String>(
-                      initialValue: _gender,
-                      decoration: InputDecoration(
-                        labelText: AppLocalizations.of(context, 'gender'),
-                        prefixIcon: const Icon(
-                          Icons.people,
-                          color: Color(0xFFFF4009),
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 16.0),
+                      child: DropdownButtonFormField<String>(
+                        initialValue: _gender,
+                        decoration: InputDecoration(
+                          labelText: AppLocalizations.of(context, 'gender'),
+                          prefixIcon: const Icon(
+                            Icons.people,
                             color: Color(0xFFFF4009),
-                            width: 2,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(
+                              color: Color(0xFFFF4009),
+                              width: 2,
+                            ),
                           ),
                         ),
+                        items: _genderOptions.map((String type) {
+                          return DropdownMenuItem<String>(
+                            value: type,
+                            child: Text(AppLocalizations.of(context, type)),
+                          );
+                        }).toList(),
+                        onChanged: (String? newValue) {
+                          setState(() {
+                            _gender = newValue;
+                          });
+                        },
                       ),
-                      items: _genderOptions.map((String type) {
-                        return DropdownMenuItem<String>(
-                          value: type,
-                          child: Text(AppLocalizations.of(context, type)),
-                        );
-                      }).toList(),
-                      onChanged: (String? newValue) {
-                        setState(() {
-                          _gender = newValue;
-                        });
-                      },
                     ),
-                    const SizedBox(height: 16),
                     GestureDetector(
                       onTap: () => _selectDate(context),
                       child: AbsorbPointer(
@@ -278,7 +287,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 16),
                     CustomTextField(
                       controller: _phoneController,
                       label: AppLocalizations.of(context, 'driver_phone_label'),
@@ -290,7 +298,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         return null;
                       },
                     ),
-                    const SizedBox(height: 32),
+                    const SizedBox(height: 16),
                     SizedBox(
                       width: double.infinity,
                       height: 50,
@@ -307,7 +315,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                                 color: Colors.white,
                               )
                             : Text(
-                                AppLocalizations.of(context, 'save_button'),
+                                AppLocalizations.of(context, 'save_data'),
                                 style: const TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.bold,

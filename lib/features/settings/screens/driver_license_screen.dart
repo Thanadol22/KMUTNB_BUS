@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
+import 'dart:typed_data';
+import 'dart:convert';
 import '../../../core/services/firebase_auth.dart';
 import '../../auth/widgets/custom_text_field.dart';
 import '../../../core/utils/app_localizations.dart';
@@ -20,7 +22,7 @@ class _DriverLicenseScreenState extends State<DriverLicenseScreen> {
   String? _licenseType;
   DateTime? _expiryDate;
   String? _licenseImageUrl;
-  File? _imageFile;
+  Uint8List? _imageBytes;
   bool _isLoading = true;
   bool _isSaving = false;
 
@@ -80,10 +82,16 @@ class _DriverLicenseScreenState extends State<DriverLicenseScreen> {
 
   Future<void> _pickImage() async {
     final ImagePicker picker = ImagePicker();
-    final XFile? image = await picker.pickImage(source: ImageSource.gallery);
+    final XFile? image = await picker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 600,
+      maxHeight: 600,
+      imageQuality: 70,
+    );
     if (image != null) {
+      final bytes = await image.readAsBytes();
       setState(() {
-        _imageFile = File(image.path);
+        _imageBytes = bytes;
       });
     }
   }
@@ -174,12 +182,10 @@ class _DriverLicenseScreenState extends State<DriverLicenseScreen> {
       String? uid = await AuthService.getCurrentUserId();
       if (uid == null) return;
 
-      // In a real app, we would upload the image to Firebase Storage here
-      // For this demo, we'll just use a placeholder URL if a new image is picked
+      final authService = AuthService();
       String? finalImageUrl = _licenseImageUrl;
-      if (_imageFile != null) {
-        // Mock upload: in real scenario use StorageTask
-        finalImageUrl = 'https://via.placeholder.com/400x250.png?text=Driver+License';
+      if (_imageBytes != null) {
+        finalImageUrl = await authService.uploadLicenseImage(_imageBytes!);
       }
 
       await FirebaseFirestore.instance.collection('driver_licenses').doc(uid).set({
@@ -247,10 +253,38 @@ class _DriverLicenseScreenState extends State<DriverLicenseScreen> {
                         ),
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(20),
-                          child: _imageFile != null
-                              ? Image.file(_imageFile!, fit: BoxFit.cover)
-                              : (_licenseImageUrl != null
-                                  ? Image.network(_licenseImageUrl!, fit: BoxFit.cover)
+                          child: _imageBytes != null
+                              ? Image.memory(_imageBytes!, fit: BoxFit.cover)
+                              : (_licenseImageUrl != null && !_licenseImageUrl!.contains('via.placeholder.com')
+                                  ? (_licenseImageUrl!.startsWith('data:image') || !_licenseImageUrl!.startsWith('http')
+                                      ? Image.memory(
+                                          base64Decode(_licenseImageUrl!.contains(',') ? _licenseImageUrl!.split(',').last : _licenseImageUrl!),
+                                          fit: BoxFit.cover,
+                                          errorBuilder: (context, error, stackTrace) {
+                                            return Column(
+                                              mainAxisAlignment: MainAxisAlignment.center,
+                                              children: [
+                                                Icon(Icons.broken_image, size: 50, color: isDark ? Colors.grey[600] : Colors.grey[400]),
+                                                const SizedBox(height: 12),
+                                                Text('โหลดรูปภาพไม่สำเร็จ แตะเพื่ออัปโหลดใหม่', style: TextStyle(color: isDark ? Colors.grey[400] : Colors.grey[600])),
+                                              ],
+                                            );
+                                          },
+                                        )
+                                      : Image.network(
+                                          _licenseImageUrl!,
+                                          fit: BoxFit.cover,
+                                          errorBuilder: (context, error, stackTrace) {
+                                            return Column(
+                                              mainAxisAlignment: MainAxisAlignment.center,
+                                              children: [
+                                                Icon(Icons.broken_image, size: 50, color: isDark ? Colors.grey[600] : Colors.grey[400]),
+                                                const SizedBox(height: 12),
+                                                Text('โหลดรูปภาพไม่สำเร็จ แตะเพื่ออัปโหลดใหม่', style: TextStyle(color: isDark ? Colors.grey[400] : Colors.grey[600])),
+                                              ],
+                                            );
+                                          },
+                                        ))
                                   : Column(
                                       mainAxisAlignment: MainAxisAlignment.center,
                                       children: [
@@ -291,34 +325,35 @@ class _DriverLicenseScreenState extends State<DriverLicenseScreen> {
                           ),
                           if (_licenseNumberController.text.isNotEmpty)
                             Padding(
-                              padding: const EdgeInsets.only(top: 8, left: 12),
+                              padding: const EdgeInsets.only(bottom: 16, left: 12),
                               child: Text(
                                 '${AppLocalizations.of(context, 'display_format')}: ${_maskLicenseNumber(_licenseNumberController.text)}',
                                 style: TextStyle(fontSize: 12, color: isDark ? Colors.grey[400] : Colors.grey[600], fontStyle: FontStyle.italic),
                               ),
                             ),
-                          const SizedBox(height: 16),
 
                           // License Type
-                          DropdownButtonFormField<String>(
-                            initialValue: _licenseTypes.contains(_licenseType) ? _licenseType : null,
-                            items: _licenseTypes.map((type) => DropdownMenuItem(value: type, child: Text(AppLocalizations.of(context, type)))).toList(),
-                            onChanged: (val) => setState(() => _licenseType = val),
-                            decoration: InputDecoration(
-                              labelText: AppLocalizations.of(context, 'license_type'),
-                              prefixIcon: const Icon(Icons.category, color: Color(0xFFFF4009)),
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                              enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: BorderSide(color: isDark ? Colors.grey[700]! : Colors.grey[300]!),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: const BorderSide(color: Color(0xFFFF4009), width: 2),
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 16.0),
+                            child: DropdownButtonFormField<String>(
+                              initialValue: _licenseTypes.contains(_licenseType) ? _licenseType : null,
+                              items: _licenseTypes.map((type) => DropdownMenuItem(value: type, child: Text(AppLocalizations.of(context, type)))).toList(),
+                              onChanged: (val) => setState(() => _licenseType = val),
+                              decoration: InputDecoration(
+                                labelText: AppLocalizations.of(context, 'license_type'),
+                                prefixIcon: const Icon(Icons.category, color: Color(0xFFFF4009)),
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: BorderSide(color: isDark ? Colors.grey[700]! : Colors.grey[300]!),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: const BorderSide(color: Color(0xFFFF4009), width: 2),
+                                ),
                               ),
                             ),
                           ),
-                          const SizedBox(height: 16),
 
                           // Expiry Date
                           InkWell(

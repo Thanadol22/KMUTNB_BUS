@@ -22,7 +22,7 @@ class _VehicleSettingsScreenState extends State<VehicleSettingsScreen> {
   bool _isLoading = true;
   bool _isSaving = false;
 
-  final List<String> _busTypeOptions = ['รถสองแถว', 'รถบัส', 'รถตู้'];
+  final List<String> _busTypeOptions = ['รถสองแถว', 'รถบัส', 'รถตู้', 'รถอีวี', 'มินิบัส'];
 
   @override
   void initState() {
@@ -147,47 +147,47 @@ class _VehicleSettingsScreenState extends State<VehicleSettingsScreen> {
                 key: _formKey,
                 child: Column(
                   children: [
-                    DropdownButtonFormField<String>(
-                      initialValue: _busType,
-                      decoration: InputDecoration(
-                        labelText: AppLocalizations.of(context, 'bus_type'),
-                        prefixIcon: const Icon(Icons.directions_bus, color: Color(0xFFFF4009)),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 16.0),
+                      child: DropdownButtonFormField<String>(
+                        initialValue: _busType,
+                        decoration: InputDecoration(
+                          labelText: AppLocalizations.of(context, 'bus_type'),
+                          prefixIcon: const Icon(Icons.directions_bus, color: Color(0xFFFF4009)),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                         ),
+                        items: _busTypeOptions.map((String type) {
+                          return DropdownMenuItem<String>(
+                            value: type,
+                            child: Text(AppLocalizations.of(context, type)),
+                          );
+                        }).toList(),
+                        onChanged: (String? newValue) {
+                          setState(() {
+                            _busType = newValue;
+                          });
+                        },
                       ),
-                      items: _busTypeOptions.map((String type) {
-                        return DropdownMenuItem<String>(
-                          value: type,
-                          child: Text(type),
-                        );
-                      }).toList(),
-                      onChanged: (String? newValue) {
-                        setState(() {
-                          _busType = newValue;
-                        });
-                      },
                     ),
-                    const SizedBox(height: 16),
                     CustomTextField(
                       controller: _busBrandController,
                       label: AppLocalizations.of(context, 'bus_brand'),
                       icon: Icons.branding_watermark,
                     ),
-                    const SizedBox(height: 16),
                     CustomTextField(
                       controller: _busSeatsController,
                       label: AppLocalizations.of(context, 'bus_seats'),
                       icon: Icons.event_seat,
                       keyboardType: TextInputType.number,
                     ),
-                    const SizedBox(height: 16),
                     CustomTextField(
                       controller: _licensePlateController,
                       label: AppLocalizations.of(context, 'license_plate_label'),
                       icon: Icons.confirmation_number,
                     ),
-                    const SizedBox(height: 32),
+                    const SizedBox(height: 16),
                     SizedBox(
                       width: double.infinity,
                       height: 50,

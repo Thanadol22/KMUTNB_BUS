@@ -304,7 +304,7 @@ class _StatusScreenState extends State<StatusScreen>
   }) {
     final controller = TextEditingController(text: currentVal);
     String? selectedType = currentVal;
-    final busTypes = ['EV Bus', 'Mini Bus', 'Van'];
+    final busTypes = ['รถสองแถว', 'รถบัส', 'รถตู้', 'รถอีวี', 'มินิบัส'];
 
     showDialog(
       context: context,
@@ -674,7 +674,7 @@ class _StatusScreenState extends State<StatusScreen>
             Text(
               AppLocalizations.of(context, code),
               style: TextStyle(
-                fontSize: 14,
+                fontSize: 13,
                 fontWeight: FontWeight.bold,
                 color: isActive
                     ? Colors.white

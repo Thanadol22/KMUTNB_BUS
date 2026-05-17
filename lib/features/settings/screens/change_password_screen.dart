@@ -95,7 +95,6 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                   return null;
                 },
               ),
-              const SizedBox(height: 16),
               CustomTextField(
                 controller: _newPasswordController,
                 label: AppLocalizations.of(context, 'new_password'),
@@ -111,7 +110,6 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                   return null;
                 },
               ),
-              const SizedBox(height: 16),
               CustomTextField(
                 controller: _confirmPasswordController,
                 label: AppLocalizations.of(context, 'confirm_new_password'),
@@ -124,7 +122,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                   return null;
                 },
               ),
-              const SizedBox(height: 32),
+              const SizedBox(height: 16),
               SizedBox(
                 width: double.infinity,
                 height: 50,

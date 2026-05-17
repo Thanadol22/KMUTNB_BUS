@@ -179,7 +179,8 @@ class AppLocalizations {
       'driver_only_access': 'แอปพลิเคชันนี้สำหรับพนักงานขับรถเท่านั้น',
       'email_login_label': 'อีเมล (@email.kmutnb.ac.th)',
       'password_too_short': 'รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร',
-      'password_complexity': 'รหัสผ่านต้องประกอบด้วยตัวอักษรพิมพ์ใหญ่ พิมพ์เล็ก และตัวเลข',
+      'password_complexity':
+          'รหัสผ่านต้องประกอบด้วยตัวอักษรพิมพ์ใหญ่ พิมพ์เล็ก และตัวเลข',
       'bus_type': 'ประเภทรถ',
       'bus_brand': 'ยี่ห้อรถ',
       'bus_seats': 'จำนวนที่นั่ง',
@@ -227,6 +228,8 @@ class AppLocalizations {
       'ทุกประเภท ชนิดที่ 3 (ท.3)': 'ทุกประเภท ชนิดที่ 3 (ท.3)',
       'ส่วนบุคคล ชนิดที่ 4 (บ.4)': 'ส่วนบุคคล ชนิดที่ 4 (บ.4)',
       'ทุกประเภท ชนิดที่ 4 (ท.4)': 'ทุกประเภท ชนิดที่ 4 (ท.4)',
+      'รถสองแถว': 'รถสองแถว',
+      'รถอีวี': 'รถอีวี',
     },
     'en': {
       'login_title': 'KMUTNB Shuttle Bus',
@@ -403,7 +406,8 @@ class AppLocalizations {
       'driver_only_access': 'This application is for drivers only',
       'email_login_label': 'Email (@email.kmutnb.ac.th)',
       'password_too_short': 'Password must be at least 8 characters long',
-      'password_complexity': 'Password must contain uppercase, lowercase, and numbers',
+      'password_complexity':
+          'Password must contain uppercase, lowercase, and numbers',
       'bus_type': 'Bus Type',
       'bus_brand': 'Bus Brand',
       'bus_seats': 'Number of Seats',
@@ -451,6 +455,8 @@ class AppLocalizations {
       'ทุกประเภท ชนิดที่ 3 (ท.3)': 'All Types Type 3 (T.3)',
       'ส่วนบุคคล ชนิดที่ 4 (บ.4)': 'Personal Type 4 (B.4)',
       'ทุกประเภท ชนิดที่ 4 (ท.4)': 'All Types Type 4 (T.4)',
+      'รถสองแถว': 'Songthaew',
+      'รถอีวี': 'EV Bus',
     },
   };
 
