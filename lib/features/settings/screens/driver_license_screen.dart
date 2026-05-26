@@ -5,6 +5,7 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'dart:convert';
 import '../../../core/services/firebase_auth.dart';
+import '../../../core/constants/app_constants.dart';
 import '../../auth/widgets/custom_text_field.dart';
 import '../../../core/utils/app_localizations.dart';
 import 'package:intl/intl.dart';
@@ -26,14 +27,7 @@ class _DriverLicenseScreenState extends State<DriverLicenseScreen> {
   bool _isLoading = true;
   bool _isSaving = false;
 
-  final List<String> _licenseTypes = [
-    'ส่วนบุคคล ชนิดที่ 2 (บ.2)',
-    'ทุกประเภท ชนิดที่ 2 (ท.2)',
-    'ส่วนบุคคล ชนิดที่ 3 (บ.3)',
-    'ทุกประเภท ชนิดที่ 3 (ท.3)',
-    'ส่วนบุคคล ชนิดที่ 4 (บ.4)',
-    'ทุกประเภท ชนิดที่ 4 (ท.4)',
-  ];
+  final List<String> _licenseTypes = AppConstants.licenseTypes;
 
   @override
   void initState() {

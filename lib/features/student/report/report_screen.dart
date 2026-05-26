@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../core/services/firebase_auth.dart';
+import '../../../core/constants/app_constants.dart';
 import '../../../core/utils/app_localizations.dart';
 
 class ReportScreen extends StatefulWidget {
@@ -31,13 +32,8 @@ class _ReportScreenState extends State<ReportScreen> {
         throw Exception('User UID not found. Please relogin.');
       }
 
-      // Convert enum/value to topic based on database.md spec
-      String topicName = '';
-      if (_selectedIssue == 'late') {
-        topicName = 'รถไม่มาตรงเวลา';
-      } else if (_selectedIssue == 'driver') topicName = 'พฤติกรรมพนักงานขับรถ';
-      else if (_selectedIssue == 'app') topicName = 'แอปพลิเคชันมีปัญหา';
-      else topicName = 'อื่นๆ';
+      // Convert enum/value to topic based on AppConstants
+      final topicName = AppConstants.reportTopics[_selectedIssue] ?? AppConstants.reportTopics['other']!;
 
       await _firestore.collection('issue_reports').add({
         'student_id': studentId,

@@ -5,7 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:firebase_auth/firebase_auth.dart' as fb_auth;
-
+import 'package:firebase_messaging/firebase_messaging.dart';
 class AuthService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
@@ -80,14 +80,20 @@ class AuthService {
         throw Exception('username_in_use');
       }
 
+      String? fcmToken = '';
+      try {
+        fcmToken = await FirebaseMessaging.instance.getToken() ?? '';
+      } catch (e) {
+        print('Error getting FCM token during registration: $e');
+      }
+
       await _firestore.collection('users').add({
         'username': username,
         'name': name,
         'password': password,
         'role': role,
-        'phone': '',
         'status': 'active',
-        'fcm_token': '',
+        'fcm_token': fcmToken,
         'created_at': FieldValue.serverTimestamp(),
       });
     } catch (e) {

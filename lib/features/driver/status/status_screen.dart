@@ -4,6 +4,7 @@ import 'package:firebase_database/firebase_database.dart';
 import '../../../core/services/firebase_auth.dart';
 import '../../../core/services/firebase_database.dart';
 import '../../../core/utils/app_localizations.dart';
+import '../../../core/constants/app_constants.dart';
 import 'dart:async';
 
 class StatusScreen extends StatefulWidget {
@@ -77,24 +78,8 @@ class _StatusScreenState extends State<StatusScreen>
         final busDoc = busSnapshot.docs.first;
         final busData = busDoc.data() as Map<String, dynamic>;
 
-        final status = busData['status']?.toString() ?? 'พร้อมบริการ';
-        String statusCode;
-        switch (status) {
-          case 'พร้อมบริการ':
-            statusCode = 'status_ready';
-            break;
-          case 'หยุดบริการ':
-            statusCode = 'status_stop';
-            break;
-          case 'ซ่อมบำรุง':
-            statusCode = 'status_maintain';
-            break;
-          case 'เติมน้ำมัน':
-            statusCode = 'status_fuel';
-            break;
-          default:
-            statusCode = 'status_ready';
-        }
+        final status = busData['status']?.toString() ?? AppConstants.statusReady;
+        final statusCode = AppConstants.statusTextToCode[status] ?? AppConstants.defaultStatusCode;
 
         final brand = busData['bus_brand']?.toString() ?? userData?['bus_brand']?.toString();
         final type = busData['bus_type']?.toString() ?? userData?['bus_type']?.toString();
@@ -216,23 +201,7 @@ class _StatusScreenState extends State<StatusScreen>
     });
 
     try {
-      String statusThai;
-      switch (newStatusCode) {
-        case 'status_ready':
-          statusThai = 'พร้อมบริการ';
-          break;
-        case 'status_stop':
-          statusThai = 'หยุดบริการ';
-          break;
-        case 'status_maintain':
-          statusThai = 'ซ่อมบำรุง';
-          break;
-        case 'status_fuel':
-          statusThai = 'เติมน้ำมัน';
-          break;
-        default:
-          statusThai = 'พร้อมบริการ';
-      }
+      final statusThai = AppConstants.statusCodeToText[newStatusCode] ?? AppConstants.statusReady;
 
       if (_busDocId != null) {
         await FirebaseFirestore.instance
@@ -304,7 +273,7 @@ class _StatusScreenState extends State<StatusScreen>
   }) {
     final controller = TextEditingController(text: currentVal);
     String? selectedType = currentVal;
-    final busTypes = ['รถสองแถว', 'รถบัส', 'รถตู้', 'รถอีวี', 'มินิบัส'];
+    final busTypes = AppConstants.busTypeOptions;
 
     showDialog(
       context: context,

@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../core/constants/app_constants.dart';
 
 class BusModel {
   final String busId;
@@ -35,7 +36,7 @@ class BusModel {
       busId: doc.id,
       licensePlate: data['license_plate'] ?? '',
       driverId: data['driver_id'] ?? '',
-      status: data['status'] ?? 'หยุดให้บริการ',
+      status: data['status'] ?? AppConstants.statusStopped,
     );
   }
 
@@ -44,7 +45,7 @@ class BusModel {
       busId: busId,
       licensePlate: '',
       driverId: data['driver_id'] ?? '',
-      status: data['status'] ?? 'ไม่ทราบสถานะ',
+      status: data['status'] ?? AppConstants.statusStopped,
       lat: double.tryParse(data['lat']?.toString() ?? '') ?? 0.0,
       lng: double.tryParse(data['lng']?.toString() ?? '') ?? 0.0,
       speed: double.tryParse(data['speed']?.toString() ?? '') ?? 0.0,

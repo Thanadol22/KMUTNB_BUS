@@ -11,6 +11,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../../../core/utils/app_localizations.dart';
 import '../../../core/utils/localization_provider.dart';
+import '../../../core/constants/app_constants.dart';
 import '../../../models/location_model.dart';
 import '../../../core/services/firebase_database.dart';
 import '../../../core/services/eta_service.dart';
@@ -33,6 +34,7 @@ class _MapScreenState extends State<MapScreen> {
   Map<String, Map<String, dynamic>> _driverCache = {};
   Map<String, Map<String, dynamic>> _busCache = {};
   List<Map<String, dynamic>> _schedulesCache = [];
+  List<Map<String, dynamic>> _detailedSchedulesCache = [];
 
   String? _selectedBusId;
   String? _selectedLocationId;
@@ -96,19 +98,36 @@ class _MapScreenState extends State<MapScreen> {
         }
 
         if (driverIds.isEmpty) {
-          return Stream.value({
-            'buses': busMap,
-            'drivers': <String, Map<String, dynamic>>{},
-          });
+          return Rx.combineLatest2(
+            FirebaseFirestore.instance.collection('schedules').snapshots(),
+            FirebaseFirestore.instance.collection('detailed_schedules').snapshots(),
+            (scheduleSnapshot, detailedScheduleSnapshot) {
+              final List<Map<String, dynamic>> scheduleList = scheduleSnapshot
+                  .docs
+                  .map((e) => e.data())
+                  .toList();
+              final List<Map<String, dynamic>> detailedScheduleList = detailedScheduleSnapshot
+                  .docs
+                  .map((e) => e.data())
+                  .toList();
+              return {
+                'buses': busMap,
+                'drivers': <String, Map<String, dynamic>>{},
+                'schedules': scheduleList,
+                'detailed_schedules': detailedScheduleList,
+              };
+            },
+          );
         }
 
-        return Rx.combineLatest2(
+        return Rx.combineLatest3(
           FirebaseFirestore.instance
               .collection('users')
               .where(FieldPath.documentId, whereIn: driverIds.toList())
               .snapshots(),
           FirebaseFirestore.instance.collection('schedules').snapshots(),
-          (userSnapshot, scheduleSnapshot) {
+          FirebaseFirestore.instance.collection('detailed_schedules').snapshots(),
+          (userSnapshot, scheduleSnapshot, detailedScheduleSnapshot) {
             final Map<String, Map<String, dynamic>> driverMap = {};
             for (var doc in userSnapshot.docs) {
               driverMap[doc.id] = doc.data();
@@ -117,10 +136,15 @@ class _MapScreenState extends State<MapScreen> {
                 .docs
                 .map((e) => e.data())
                 .toList();
+            final List<Map<String, dynamic>> detailedScheduleList = detailedScheduleSnapshot
+                .docs
+                .map((e) => e.data())
+                .toList();
             return {
               'buses': busMap,
               'drivers': driverMap,
               'schedules': scheduleList,
+              'detailed_schedules': detailedScheduleList,
             };
           },
         );
@@ -165,11 +189,19 @@ class _MapScreenState extends State<MapScreen> {
           .map((e) => e.data())
           .toList();
 
+      final detailedScheduleSnapshot = await FirebaseFirestore.instance
+          .collection('detailed_schedules')
+          .get();
+      final List<Map<String, dynamic>> detailedScheduleList = detailedScheduleSnapshot.docs
+          .map((e) => e.data())
+          .toList();
+
       if (mounted) {
         setState(() {
           _busCache = busMap;
           _driverCache = driverMap;
           _schedulesCache = scheduleList;
+          _detailedSchedulesCache = detailedScheduleList;
         });
       }
     } catch (_) {}
@@ -214,19 +246,24 @@ class _MapScreenState extends State<MapScreen> {
 
   Color _getFirestoreStatusColor(String status) {
     switch (status) {
-      case 'พร้อมให้บริการ':
-      case 'กำลังวิ่ง':
-      case 'รับส่งตรงป้าย':
-        return const Color(0xFF2ECC71); // Green matching the image
-      case 'หยุดให้บริการ':
+      case AppConstants.statusReady:
+        return const Color(0xFF2ECC71);
+      case AppConstants.statusStopped:
         return Colors.grey;
-      case 'ซ่อมบำรุง':
+      case AppConstants.statusMaintenance:
         return Colors.red;
-      case 'เติมน้ำมัน':
+      case AppConstants.statusRefueling:
         return Colors.blue;
       default:
         return const Color(0xFF2ECC71);
     }
+  }
+
+  int? _toTimestampMs(dynamic val) {
+    if (val == null) return null;
+    if (val is num) return val.toInt();
+    if (val is Timestamp) return val.millisecondsSinceEpoch;
+    return int.tryParse(val.toString());
   }
 
   Map<String, String> _calculateRouteAndETA(
@@ -235,6 +272,8 @@ class _MapScreenState extends State<MapScreen> {
     Map<String, dynamic>? activeRound,
     String boardDate,
     String boardTime,
+    String? lastVisitedStopName,
+    int? lastVisitedTimestampMs,
   ) {
     // ดึง locale ปัจจุบันสำหรับ format ETA
     final locale = Provider.of<LocalizationProvider>(
@@ -251,6 +290,8 @@ class _MapScreenState extends State<MapScreen> {
       activeRound: activeRound,
       boardDate: boardDate,
       boardTime: boardTime,
+      lastVisitedStopName: lastVisitedStopName,
+      lastVisitedTimestampMs: lastVisitedTimestampMs,
       locale: locale,
     );
 
@@ -320,6 +361,9 @@ class _MapScreenState extends State<MapScreen> {
                 );
                 _schedulesCache = List<Map<String, dynamic>>.from(
                   firestoreSnapshot.data!['schedules'] ?? [],
+                );
+                _detailedSchedulesCache = List<Map<String, dynamic>>.from(
+                  firestoreSnapshot.data!['detailed_schedules'] ?? [],
                 );
               }
 
@@ -391,7 +435,7 @@ class _MapScreenState extends State<MapScreen> {
                       }
 
                       DateTime now = DateTime.now();
-                      Map<String, dynamic>? activeRound;
+                      Map<String, dynamic>? activeSchedule;
                       for (var s in _schedulesCache) {
                         if (s['bus_id'] != busId && s['bus_id'] != 'bus_01') {
                           continue;
@@ -422,26 +466,38 @@ class _MapScreenState extends State<MapScreen> {
                               now.isBefore(
                                 end.add(const Duration(minutes: 10)),
                               )) {
-                            if (activeRound == null) {
-                              activeRound = s;
+                            if (activeSchedule == null) {
+                              activeSchedule = s;
                             } else {
                               DateTime currStart = DateTime(
                                 now.year,
                                 now.month,
                                 now.day,
                                 int.parse(
-                                  activeRound['start_time'].split(':')[0],
+                                  activeSchedule['start_time'].split(':')[0],
                                 ),
                                 int.parse(
-                                  activeRound['start_time'].split(':')[1],
+                                  activeSchedule['start_time'].split(':')[1],
                                 ),
                               );
                               if ((now.difference(start).inMinutes).abs() <
                                   (now.difference(currStart).inMinutes).abs()) {
-                                activeRound = s;
+                                activeSchedule = s;
                               }
                             }
                           }
+                        }
+                      }
+
+                      Map<String, dynamic>? activeRound;
+                      if (activeSchedule != null) {
+                        final activeStart = activeSchedule['start_time']?.toString() ?? '';
+                        activeRound = _detailedSchedulesCache.firstWhere(
+                          (ds) => ds['start_time']?.toString() == activeStart,
+                          orElse: () => <String, dynamic>{},
+                        );
+                        if (activeRound.isEmpty) {
+                          activeRound = null;
                         }
                       }
 
@@ -450,6 +506,10 @@ class _MapScreenState extends State<MapScreen> {
                           AppLocalizations.of(context, 'status_unknown');
                       final boardDate = busInfo['date']?.toString() ?? '';
                       final boardTime = busInfo['time']?.toString() ?? '-';
+
+                      final busDoc = _busCache[busId];
+                      final lastVisitedStopName = busDoc?['last_visited_stop']?.toString();
+                      final lastVisitedTimestampMs = _toTimestampMs(busDoc?['last_visited_time']);
 
                       Map<String, String> computedRouteInfo = {
                         'round': '-',
@@ -465,6 +525,8 @@ class _MapScreenState extends State<MapScreen> {
                           activeRound,
                           boardDate,
                           boardTime,
+                          lastVisitedStopName,
+                          lastVisitedTimestampMs,
                         );
                       }
 

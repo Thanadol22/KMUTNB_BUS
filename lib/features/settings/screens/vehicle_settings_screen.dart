@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../core/services/firebase_auth.dart';
 import '../../../core/services/firebase_database.dart';
+import '../../../core/constants/app_constants.dart';
 import '../../auth/widgets/custom_text_field.dart';
 import '../../../core/utils/app_localizations.dart';
 
@@ -22,7 +23,7 @@ class _VehicleSettingsScreenState extends State<VehicleSettingsScreen> {
   bool _isLoading = true;
   bool _isSaving = false;
 
-  final List<String> _busTypeOptions = ['รถสองแถว', 'รถบัส', 'รถตู้', 'รถอีวี', 'มินิบัส'];
+  final List<String> _busTypeOptions = AppConstants.busTypeOptions;
 
   @override
   void initState() {

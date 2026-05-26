@@ -5,7 +5,7 @@ import '../../../core/services/firebase_auth.dart';
 import '../../../core/theme/theme_provider.dart';
 import '../../../core/utils/localization_provider.dart';
 import '../../../core/utils/app_localizations.dart';
-import 'edit_profile_screen.dart';
+import 'student_edit_profile_screen.dart';
 import 'change_password_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -44,7 +44,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             onTap: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => const EditProfileScreen()),
+                MaterialPageRoute(builder: (context) => const StudentEditProfileScreen()),
               );
             },
           ),

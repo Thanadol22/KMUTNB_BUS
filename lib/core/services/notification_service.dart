@@ -127,6 +127,17 @@ class NotificationService {
         return;
       }
 
+      // Check role from SharedPreferences or Firestore to decide if we should skip saving
+      String? role = prefs.getString('role');
+      if (role == null) {
+        final doc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
+        if (doc.exists) {
+          role = doc.data()?['role'];
+        }
+      }
+
+      // Removed the role check that skips FCM token save
+
       await FirebaseFirestore.instance.collection('users').doc(uid).update({
         'fcm_token': token,
       });

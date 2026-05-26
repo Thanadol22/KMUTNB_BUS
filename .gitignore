@@ -89,3 +89,5 @@ ios/Runner/GoogleService-Info.plist
 # Service Account Key
 service.json
 *-adminsdk-*.json
+
+/document

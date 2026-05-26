@@ -19,6 +19,7 @@ class AppLocalizations {
       'already_have_account': 'มีบัญชีอยู่แล้ว? เข้าสู่ระบบ',
       'student_role': 'นักศึกษา',
       'driver_role': 'พนักงานขับรถ',
+      'teacher_role': 'อาจารย์',
       'full_name': 'ชื่อ-นามสกุล',
       'confirm_password': 'ยืนยันรหัสผ่าน',
       'fill_all_fields': 'กรุณากรอกข้อมูลให้ครบถ้วน',
@@ -175,9 +176,10 @@ class AppLocalizations {
       'stale_data': 'ข้อมูลไม่อัปเดต',
       'gps_disconnected': 'GPS ขาดการติดต่อ',
       'off_schedule': 'นอกเวลาวิ่ง',
-      'invalid_email_domain': 'กรุณาใช้เมล @email.kmutnb.ac.th เท่านั้น',
+      'invalid_email_domain':
+          'กรุณาใช้เมล @email.kmutnb.ac.th, @itm.kmutnb.ac.th หรือ @fitm.kmutnb.ac.th เท่านั้น',
       'driver_only_access': 'แอปพลิเคชันนี้สำหรับพนักงานขับรถเท่านั้น',
-      'email_login_label': 'อีเมล (@email.kmutnb.ac.th)',
+      'email_login_label': 'อีเมล (นักศึกษา หรือ อาจารย์)',
       'password_too_short': 'รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร',
       'password_complexity':
           'รหัสผ่านต้องประกอบด้วยตัวอักษรพิมพ์ใหญ่ พิมพ์เล็ก และตัวเลข',
@@ -246,6 +248,7 @@ class AppLocalizations {
       'already_have_account': 'Already have an account? Login',
       'student_role': 'Student',
       'driver_role': 'Driver',
+      'teacher_role': 'Teacher',
       'full_name': 'Full Name',
       'confirm_password': 'Confirm Password',
       'fill_all_fields': 'Please fill in all fields',
@@ -402,9 +405,11 @@ class AppLocalizations {
       'stale_data': 'Data not updated',
       'gps_disconnected': 'GPS disconnected',
       'off_schedule': 'Off schedule',
-      'invalid_email_domain': 'Please use @email.kmutnb.ac.th only',
+      'invalid_email_domain':
+          'Please use @email.kmutnb.ac.th, @itm.kmutnb.ac.th, or @fitm.kmutnb.ac.th only',
       'driver_only_access': 'This application is for drivers only',
-      'email_login_label': 'Email (@email.kmutnb.ac.th)',
+      'email_login_label':
+          'Email (@email.kmutnb.ac.th, @itm.kmutnb.ac.th, @fitm.kmutnb.ac.th)',
       'password_too_short': 'Password must be at least 8 characters long',
       'password_complexity':
           'Password must contain uppercase, lowercase, and numbers',

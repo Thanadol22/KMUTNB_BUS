@@ -5,6 +5,7 @@ import '../widgets/custom_text_field.dart';
 import 'register_screen.dart';
 import '../../../core/utils/app_localizations.dart';
 import '../../../core/services/firebase_auth.dart';
+import '../../../core/constants/app_constants.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -47,10 +48,13 @@ class _LoginScreenState extends State<LoginScreen> {
         isAllowed = true; // คนขับรถเข้าได้ทุกลิขสิทธิ์อีเมล
       } else if (role == 'student') {
         // นักศึกษาต้องใช้เมล @email.kmutnb.ac.th เท่านั้น
-        if (username.endsWith('@email.kmutnb.ac.th')) {
+        if (AppConstants.isStudentEmail(username)) {
           isAllowed = true;
-        } else {
-          isAllowed = false;
+        }
+      } else if (role == 'teacher' || role == 'อาจารย์') {
+        // อาจารย์ต้องใช้เมล @itm.kmutnb.ac.th หรือ @fitm.kmutnb.ac.th เท่านั้น
+        if (AppConstants.isTeacherEmail(username)) {
+          isAllowed = true;
         }
       }
 

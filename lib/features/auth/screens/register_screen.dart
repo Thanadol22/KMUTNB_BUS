@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../widgets/custom_text_field.dart';
 import '../../../core/services/firebase_auth.dart';
+import '../../../core/constants/app_constants.dart';
 import '../../../core/utils/app_localizations.dart';
 
 class RegisterScreen extends StatefulWidget {
@@ -71,8 +72,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
       return;
     }
 
-    // ตรวจสอบรูปแบบอีเมลนักศึกษา @email.kmutnb.ac.th
-    if (!username.endsWith('@email.kmutnb.ac.th')) {
+    // ตรวจสอบรูปแบบอีเมล มจพ. (นักศึกษา หรือ อาจารย์)
+    final isStudentEmail = AppConstants.isStudentEmail(username);
+    final isTeacherEmail = AppConstants.isTeacherEmail(username);
+
+    if (!isStudentEmail && !isTeacherEmail) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(AppLocalizations.of(context, 'invalid_email_domain')),
@@ -86,12 +90,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
       _isLoading = true;
     });
 
+    final String role = isTeacherEmail ? 'teacher' : 'student';
+
     try {
       await _authService.registerUser(
         username: username,
         name: name,
         password: password,
-        role: 'student', // สมัครได้เฉพาะนักศึกษา
+        role: role,
       );
 
       if (mounted) {

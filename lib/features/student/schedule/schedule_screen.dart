@@ -209,38 +209,75 @@ class ScheduleScreen extends StatelessWidget {
           ),
 
           // ผู้รับผิดชอบ
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: isDark ? Colors.grey.shade900 : Colors.grey.shade50,
-              border: Border(top: BorderSide(color: Colors.grey.shade300)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  AppLocalizations.of(context, 'responsible_person'),
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xE6FF4009)),
+          StreamBuilder<QuerySnapshot>(
+            stream: FirebaseFirestore.instance
+                .collection('users')
+                .where('role', isEqualTo: 'driver')
+                .where('status', isEqualTo: 'active')
+                .snapshots(),
+            builder: (context, driverSnapshot) {
+              if (driverSnapshot.connectionState == ConnectionState.waiting) {
+                return const SizedBox.shrink();
+              }
+
+              final driverDocs = driverSnapshot.data?.docs ?? [];
+              if (driverDocs.isEmpty) {
+                return const SizedBox.shrink();
+              }
+
+              // Sort drivers by name to keep ordering consistent
+              final sortedDrivers = driverDocs.toList()
+                ..sort((a, b) {
+                  final nameA = (a.data() as Map<String, dynamic>)['name'] ?? '';
+                  final nameB = (b.data() as Map<String, dynamic>)['name'] ?? '';
+                  return nameA.compareTo(nameB);
+                });
+
+              return Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: isDark ? Colors.grey.shade900 : Colors.grey.shade50,
+                  border: Border(top: BorderSide(color: Colors.grey.shade300)),
                 ),
-                const SizedBox(height: 4),
-                ...ScheduleData.drivers.map((driver) => Padding(
-                  padding: const EdgeInsets.only(bottom: 2),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.person, size: 14, color: Colors.grey),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Text(
-                          '${driver['name']?.replaceAll('นาย', AppLocalizations.of(context, 'driver_prefix'))}  ${AppLocalizations.of(context, 'driver_phone')}. ${driver['phone']}',
-                          style: const TextStyle(fontSize: 12),
-                        ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      AppLocalizations.of(context, 'responsible_person'),
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                        color: const Color(0xE6FF4009),
                       ),
-                    ],
-                  ),
-                )),
-              ],
-            ),
+                    ),
+                    const SizedBox(height: 4),
+                    ...List.generate(sortedDrivers.length, (index) {
+                      final driverData = sortedDrivers[index].data() as Map<String, dynamic>;
+                      final rawName = driverData['name'] ?? '';
+                      final phone = driverData['phone'] ?? '';
+                      final formattedName = rawName.replaceAll('นาย', AppLocalizations.of(context, 'driver_prefix'));
+
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 2),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.person, size: 14, color: Colors.grey),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                '${index + 1}. $formattedName  ${AppLocalizations.of(context, 'driver_phone')}. $phone',
+                                style: const TextStyle(fontSize: 12),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }),
+                  ],
+                ),
+              );
+            },
           ),
         ],
       ),
