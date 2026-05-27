@@ -267,6 +267,7 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   Map<String, String> _calculateRouteAndETA(
+    String busId,
     LatLng busLocation,
     double speedKmh,
     Map<String, dynamic>? activeRound,
@@ -283,6 +284,7 @@ class _MapScreenState extends State<MapScreen> {
 
     // เรียกใช้ EtaService ที่ปรับปรุงแล้ว (spatial-based)
     final result = EtaService.compute(
+      busId: busId,
       busLat: busLocation.latitude,
       busLng: busLocation.longitude,
       speedKmh: speedKmh,
@@ -520,6 +522,7 @@ class _MapScreenState extends State<MapScreen> {
                       };
                       if (lat != null && lon != null) {
                         computedRouteInfo = _calculateRouteAndETA(
+                          busId,
                           LatLng(lat, lon),
                           speed,
                           activeRound,

@@ -82,6 +82,9 @@ double haversine(double lat1, double lon1, double lat2, double lon2) {
 // ==================== ETA Service ====================
 
 class EtaService {
+  static final Map<String, int> _busNextStopIndices = {};
+  static final Map<String, String> _busActiveRounds = {};
+
   /// ดึงลำดับป้ายจาก DB และแมปพิกัด
   static List<BusStop> buildOrderedStops(
     List<dynamic> scheduleStops,
@@ -138,6 +141,7 @@ class EtaService {
 
   /// ===== ฟังก์ชันหลัก: คำนวณ Route + ETA ทั้งหมด =====
   static RouteEtaResult compute({
+    required String busId,
     required double busLat,
     required double busLng,
     required double speedKmh,
@@ -188,6 +192,7 @@ class EtaService {
     final orderedStops = buildOrderedStops(scheduleStops, firestoreLocations);
 
     final roundText = '${activeRound['start_time']} - ${activeRound['end_time']}';
+    final String currentRoundId = activeRound['id']?.toString() ?? roundText;
 
     if (orderedStops.isEmpty) {
       return RouteEtaResult(
@@ -199,132 +204,114 @@ class EtaService {
       );
     }
 
-    // --- ขั้นตอนที่ 2: หาป้ายที่อยู่ใกล้รถที่สุด (Nearest Stop) ---
-    int nearestIdx = 0;
-    double nearestDist = double.infinity;
-
-    for (int i = 0; i < orderedStops.length; i++) {
-      final double dist = haversine(
-        busLat, busLng,
-        orderedStops[i].lat, orderedStops[i].lng
-      );
-      if (dist < nearestDist) {
-        nearestDist = dist;
-        nearestIdx = i;
-      }
+    // --- ตรวจจับการเปลี่ยนรอบ (Round Reset) ---
+    if (_busActiveRounds[busId] != currentRoundId) {
+      _busActiveRounds[busId] = currentRoundId;
+      _busNextStopIndices[busId] = 0; // เริ่มต้นที่ป้ายแรกใหม่
     }
 
-    // --- ขั้นตอนที่ 3: กำหนดป้ายถัดไปตามสูตรและสถานะ Geofence ของรถ ---
-    int nextStopIdx;
+    int nextStopIdx = _busNextStopIndices[busId] ?? 0;
 
-    if (nearestDist <= atStopThresholdM) {
-      // รถจอดอยู่ที่สถานีแล้ว -> เป้าหมายถัดไปคือสถานีข้างหน้า
-      nextStopIdx = nearestIdx + 1;
-    } else {
-      // อยู่ระหว่างเดินทาง -> เช็คว่าผ่านป้ายใกล้สุดไปหรือยัง
-      if (nearestIdx + 1 < orderedStops.length) {
-        final double distToNext = haversine(
-          busLat, busLng,
-          orderedStops[nearestIdx + 1].lat, orderedStops[nearestIdx + 1].lng
-        );
-        final double distBetween = haversine(
-          orderedStops[nearestIdx].lat, orderedStops[nearestIdx].lng,
-          orderedStops[nearestIdx + 1].lat, orderedStops[nearestIdx + 1].lng
-        );
-
-        if (distToNext < distBetween) {
-          nextStopIdx = nearestIdx + 1; // วิ่งเลยป้ายใกล้สุดมาแล้ว
-        } else {
-          nextStopIdx = nearestIdx; // กำลังวิ่งไปหาป้ายใกล้สุด
-        }
-      } else {
-        nextStopIdx = nearestIdx;
-      }
-    }
-
-    // --- ขั้นตอนที่ 4: บังคับเส้นทางไม่ให้วิ่งย้อนกลับ (Sequence Enforcement) ร่วมกับข้อมูลจาก Daemon ---
-    if (lastVisitedStopName != null && lastVisitedTimestampMs != null) {
-      final int nowMs = DateTime.now().millisecondsSinceEpoch;
-      // มีผลเฉพาะข้อมูลที่เข้าป้ายที่อัปเดตไม่เกิน 30 นาที
-      if ((nowMs - lastVisitedTimestampMs) < 30 * 60 * 1000) {
-        final int lastIdx = orderedStops.indexWhere((s) => s.name == lastVisitedStopName);
-        if (lastIdx != -1 && nextStopIdx <= lastIdx) {
-          nextStopIdx = lastIdx + 1; // บังคับข้ามไปป้ายถัดไปจากป้ายที่พึ่งจอดแล้วจริง
-        }
-      }
-    }
-
-    // --- ขั้นตอนที่ 5: เช็คกรณีเลยป้ายสุดท้าย (ครบรอบเดินรถ) ---
+    // --- เช็คกรณีเลยป้ายสุดท้าย (ครบรอบเดินรถ) ---
     if (nextStopIdx >= orderedStops.length) {
       return RouteEtaResult(
         round: roundText,
-        currentStop: orderedStops[nearestIdx].name,
+        currentStop: orderedStops.last.name,
         nextStop: 'ครบรอบแล้ว',
         etaText: '-',
         etaAbsolute: '',
       );
     }
 
-    final BusStop targetStop = orderedStops[nextStopIdx];
+    // --- คำนวณระยะทางถึงป้ายเป้าหมาย (Next Stop) ---
+    double distToNext = haversine(
+      busLat, busLng,
+      orderedStops[nextStopIdx].lat, orderedStops[nextStopIdx].lng
+    );
 
-    // --- กำหนดชื่อป้ายปัจจุบัน ---
-    String currentStopResult;
-    if (nearestDist <= atStopThresholdM) {
-      currentStopResult = orderedStops[nearestIdx].name;
-    } else {
-      if (nextStopIdx == nearestIdx) {
-        currentStopResult = locale == 'th' ? 'กำลังไป ${orderedStops[nearestIdx].name}' : 'Going to ${orderedStops[nearestIdx].name}';
-      } else {
-        currentStopResult = locale == 'th' 
-          ? 'ระหว่าง ${orderedStops[nearestIdx].name} กับ ${orderedStops[nextStopIdx].name}' 
-          : 'Between ${orderedStops[nearestIdx].name} and ${orderedStops[nextStopIdx].name}';
+    // --- บังคับเส้นทางด้วยข้อมูลจาก Daemon (Server Sync Fallback) ---
+    // ใช้ข้อมูลจาก Node.js เผื่อแอปพลิเคชันมือถือพลาดการตรวจจับรัศมี 80 เมตร
+    if (lastVisitedStopName != null && lastVisitedTimestampMs != null) {
+      final int nowMs = DateTime.now().millisecondsSinceEpoch;
+      // มีผลเฉพาะข้อมูลที่เข้าป้ายที่อัปเดตไม่เกิน 30 นาที
+      if ((nowMs - lastVisitedTimestampMs) < 30 * 60 * 1000) {
+        final int lastIdx = orderedStops.indexWhere((s) => s.name == lastVisitedStopName);
+        if (lastIdx != -1 && nextStopIdx <= lastIdx) {
+          nextStopIdx = lastIdx + 1; // ขยับ Index ไปยังป้ายถัดไปจากที่ Daemon คอนเฟิร์ม
+          _busNextStopIndices[busId] = nextStopIdx;
+          
+          if (nextStopIdx < orderedStops.length) {
+             distToNext = haversine(
+                busLat, busLng,
+                orderedStops[nextStopIdx].lat, orderedStops[nextStopIdx].lng
+             );
+          }
+        }
       }
     }
 
-    // --- ขั้นตอนที่ 6: คำนวณระยะทางตามแนวถนน (Route Distance) ---
-    double routeDistance = 0.0;
-    if (nextStopIdx == nearestIdx) {
-      routeDistance = nearestDist;
-    } else {
-      routeDistance = nearestDist;
-      for (int i = nearestIdx; i < nextStopIdx; i++) {
-        routeDistance += haversine(
-          orderedStops[i].lat, orderedStops[i].lng,
-          orderedStops[i + 1].lat, orderedStops[i + 1].lng
+    // --- ตรรกะการเข้าถึงป้าย (Sequential Stop logic) ---
+    if (distToNext <= atStopThresholdM) {
+      // บันทึกว่าถึงแล้ว โดยการดันเป้าหมายไปเป็นป้ายถัดไป
+      nextStopIdx++;
+      _busNextStopIndices[busId] = nextStopIdx;
+
+      if (nextStopIdx >= orderedStops.length) {
+        return RouteEtaResult(
+          round: roundText,
+          currentStop: orderedStops.last.name,
+          nextStop: 'ครบรอบแล้ว',
+          etaText: '-',
+          etaAbsolute: '',
         );
       }
+      
+      // เป้าหมายถัดไปเปลี่ยนไปแล้ว คำนวณระยะใหม่สำหรับป้ายหน้า
+      distToNext = haversine(
+        busLat, busLng,
+        orderedStops[nextStopIdx].lat, orderedStops[nextStopIdx].lng
+      );
     }
 
-    // คูณด้วยสัมประสิทธิ์ถนนคดเคี้ยว
-    routeDistance = routeDistance * roadFactor;
+    final BusStop targetStop = orderedStops[nextStopIdx];
 
-    // --- ขั้นตอนที่ 7: คำนวณ ETA ---
+    // --- กำหนดชื่อป้ายปัจจุบัน (อ้างอิงจากป้ายที่เพิ่งผ่านมาหรือจุดเริ่มต้น) ---
+    String currentStopResult;
+    if (nextStopIdx == 0) {
+      currentStopResult = locale == 'th' ? 'กำลังเริ่มไป ${targetStop.name}' : 'Starting to ${targetStop.name}';
+    } else {
+      final BusStop prevStop = orderedStops[nextStopIdx - 1];
+      currentStopResult = locale == 'th' 
+        ? 'ระหว่าง ${prevStop.name} กับ ${targetStop.name}' 
+        : 'Between ${prevStop.name} and ${targetStop.name}';
+    }
+
+    // --- คำนวณระยะทางวิ่ง (ใช้ตรงเส้น + ชดเชย) ---
+    double routeDistance = distToNext * roadFactor;
+
+    // --- คำนวณ ETA ---
     if (routeDistance <= atStopThresholdM) {
       return RouteEtaResult(
         round: roundText,
-        currentStop: currentStopResult,
+        currentStop: targetStop.name, // ปรับให้แสดงชื่อเป้าหมายเป็นปัจจุบันเลย
         nextStop: targetStop.name,
         etaText: locale == 'th' ? 'กำลังถึงป้าย' : 'Arriving',
         etaAbsolute: '',
       );
     }
 
-    // คัดเลือกความเร็วใช้งาน
     final double activeSpeedKmh = (speedKmh > movingThresholdKmh)
         ? speedKmh
         : fallbackSpeedKmh;
 
-    // แปลงความเร็วเป็น เมตร/วินาที
     final double speedMs = activeSpeedKmh * (1000.0 / 3600.0);
     final double etaSeconds = routeDistance / speedMs;
 
-    // หาเวลาสัมบูรณ์ (Absolute Time) ที่จะถึง
     final DateTime arrivalTime = DateTime.now().add(Duration(seconds: etaSeconds.round()));
     final String padH = arrivalTime.hour.toString().padLeft(2, '0');
     final String padM = arrivalTime.minute.toString().padLeft(2, '0');
     final String timeStr = locale == 'th' ? "$padH:$padM น." : "$padH:$padM";
 
-    // ฟอร์แมตข้อความแสดงผล
     String etaText;
     String etaAbsolute;
     if (etaSeconds < 60) {
